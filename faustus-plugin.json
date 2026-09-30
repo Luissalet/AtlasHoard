@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "id": "atlas",
+  "name": "Atlas's Hoard",
+  "purpose": "A local workspace for research cases: sources with graded reliability, entities and evidence-backed relations, a timeline, a map and competing-hypotheses analysis, for assistants over MCP.",
+  "capabilities": [
+    "research-cases",
+    "source-capture",
+    "source-grading",
+    "entity-registry",
+    "evidence-backed-relations",
+    "retraction-cascade",
+    "timeline-as-of",
+    "map-layers",
+    "relation-graph",
+    "competing-hypotheses",
+    "wikidata-enrichment",
+    "geocoding",
+    "family-search",
+    "case-reports",
+    "citation-check"
+  ],
+  "placeholders": [
+    "ATLAS_DIR",
+    "APP_URL",
+    "TOKEN_FILE",
+    "PYTHON"
+  ],
+  "defaults": {
+    "APP_URL": "http://127.0.0.1:5193",
+    "TOKEN_FILE": "{ATLAS_DIR}/data/mcp-token",
+    "PYTHON": "{ATLAS_DIR}/venv/Scripts/python.exe"
+  },
+  "app": {
+    "url_default": "http://127.0.0.1:5193",
+    "ui_url": "{APP_URL}",
+    "health": {
+      "path": "/api/health",
+      "expect": {
+        "service": "atlas-hoard"
+      }
+    },
+    "identify": {
+      "service": [
+        "atlas-hoard"
+      ],
+      "title": [
+        "atlas's hoard",
+        "casos de investigación"
+      ]
+    },
+    "launch_hint": {
+      "kind": "process",
+      "executable": "{PYTHON}",
+      "argv": [
+        "-m",
+        "atlas_hoard"
+      ],
+      "cwd": "{ATLAS_DIR}",
+      "env": {
+        "PORT_STRICT": "1",
+        "ATLAS_PORT": "5193"
+      },
+      "readiness": {
+        "url": "{APP_URL}/api/health",
+        "timeout_s": 30
+      }
+    }
+  },
+  "mcp": {
+    "transport": "stdio",
+    "command": "{PYTHON}",
+    "args": [
+      "{ATLAS_DIR}/mcp_server.py"
+    ],
+    "env": {
+      "ATLAS_URL": "{APP_URL}",
+      "ATLAS_TOKEN_FILE": "{TOKEN_FILE}"
+    },
+    "optional_env": [
+      "ATLAS_BRIDGE_AUTOSTART",
+      "ATLAS_DATA_DIR"
+    ]
+  },
+  "notes": "Keep the app running (python -m atlas_hoard): the MCP bridge proxies every call to the local server, never opens the database, and starts the app itself when it is not answering. Tools that change or delete something: case_create, case_update, source_add, source_retract, entity_upsert, entity_merge, relation_add, relation_update, relation_retract, hypothesis_add, ach_rate, enrich, enrichment_undo; deletes need action=delete and confirm=true and only when the user asks. Enrichers never run on private persons; URL capture refuses social networks."
+}

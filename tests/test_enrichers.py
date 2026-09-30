@@ -225,9 +225,9 @@ def test_family_search_redacts_private_names(tmp_path):
         c = cases.create(svc, title="F")["case"]
         entities.upsert(svc, case_id=c["id"], type="person", name="Bob Smith", aliases=["Bobby"])
         res = enrich.run(svc, enricher="family_search", case_id=c["id"], query="contract between Acme and Bob Smith")
-        assert "bob smith" not in svc.fake_family.calls[0][2]["query"].lower() and "bob smith" in " ".join(res["redacted"]).lower()
+        assert "bob smith" not in svc.fake_family.calls[0][2]["q"].lower() and "bob smith" in " ".join(res["redacted"]).lower()
         enrich.run(svc, enricher="family_search", case_id=c["id"], query="Bob Smith", include_private=True)
-        assert any("bob smith" in call[2]["query"].lower() for call in svc.fake_family.calls)
+        assert any("bob smith" in call[2]["q"].lower() for call in svc.fake_family.calls)
         with pytest.raises(Refused):
             enrich.run(svc, enricher="family_search", case_id=c["id"], query="Bobby")  # nothing is left after redaction
     finally:

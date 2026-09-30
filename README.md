@@ -125,7 +125,7 @@ Results sent to an assistant are trimmed to about 20 KB with a hint to narrow or
 ## Family
 
 Atlas works alone. When the other apps of the family run, `family_search` looks up the Borges library
-(`library_search`) and Links (`links_search`) through the hub or directly, and keeps each hit as a `family_ref` source
+(`library_search`) and Links (`search_links`) through the hub or directly, and keeps each hit as a `family_ref` source
 (`hoard://<app>/<kind>/<id>` with a short excerpt); an app that does not answer is skipped. The tool names are
 configurable in Settings. Atlas emits `atlas.case.created`, `atlas.relation.added`, `atlas.relation.status_changed`
 and `atlas.source.retracted`, and its cases are addressable as `hoard://atlas/case/<id>`.

@@ -26,7 +26,7 @@ from .util import jdump, jload
 log = logging.getLogger("atlas")
 
 DEFAULT_FAMILY_SOURCES = ["borges", "links"]
-DEFAULT_FAMILY_TOOLS = {"borges": "library_search", "links": "links_search"}
+DEFAULT_FAMILY_TOOLS = {"borges": "library_search", "links": "search_links"}
 
 
 def write_token(config: Config) -> str:

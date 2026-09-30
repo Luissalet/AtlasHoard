@@ -77,7 +77,7 @@ def test_model_prompt_never_asks_for_more_about_private_people(tmp_path):
 
 
 def test_settings_validation_and_defaults(services):
-    assert services.family_tools() == {"borges": "library_search", "links": "links_search"}
+    assert services.family_tools() == {"borges": "library_search", "links": "search_links"}
     out = services.update_settings({"family_sources": ["borges"], "family_tools": {"borges": "library_search_v2"}})
     assert out["family_sources"] == ["borges"] and services.family_tools()["borges"] == "library_search_v2"
     with pytest.raises(AtlasError):

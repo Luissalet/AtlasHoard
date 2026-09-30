@@ -83,7 +83,8 @@ def run(ctx: RunContext) -> dict:
         if not tool:
             out[app] = {"status": "unknown_app", "hint": f"No search tool is configured for {app!r} (Settings > family sources)."}
             continue
-        reply = svc.family_call(app, tool, {"query": query, "limit": limit})
+        # Both family search tools take the query as `q` (Borges library_search, Links search_links).
+        reply = svc.family_call(app, tool, {"q": query, "limit": limit})
         if not reply.get("ok"):
             out[app] = {"status": "unavailable", "error": str(reply.get("error") or f"HTTP {reply.get('status')}")[:300]}
             continue

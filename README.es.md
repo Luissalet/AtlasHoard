@@ -116,7 +116,7 @@ Los resultados enviados a un asistente se recortan a unos 20 KB con una pista pa
 ## Familia
 
 Atlas funciona solo. Cuando las demás apps de la familia están en marcha, `family_search` consulta la biblioteca de
-Borges (`library_search`) y Links (`links_search`) a través del hub o directamente, y guarda cada resultado como
+Borges (`library_search`) y Links (`search_links`) a través del hub o directamente, y guarda cada resultado como
 fuente `family_ref` (`hoard://<app>/<tipo>/<id>` con un extracto corto); si una app no responde, se omite. Los nombres
 de las herramientas se configuran en Ajustes. Atlas emite `atlas.case.created`, `atlas.relation.added`,
 `atlas.relation.status_changed` y `atlas.source.retracted`, y sus casos se direccionan como `hoard://atlas/case/<id>`.

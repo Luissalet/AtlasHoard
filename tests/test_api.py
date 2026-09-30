@@ -213,7 +213,7 @@ def test_readmes_document_every_tool_and_no_slogans():
 
 def test_no_other_product_names_in_the_repository():
     banned = re.compile("|".join(re.escape(w) for w in BANNED_WORDS), re.I)
-    skip = {"node_modules", ".git", "static", "__pycache__", "dist-icons", ".pytest_cache", "hoard_link"}  # hoard_link is the shared library, vendored unchanged
+    skip = {"node_modules", ".git", "venv", ".venv", "data", "static", "__pycache__", "dist-icons", ".pytest_cache", "hoard_link"}  # hoard_link is the shared library, vendored unchanged
     offenders = []
     for path in ROOT.rglob("*"):
         if not path.is_file() or any(part in skip for part in path.relative_to(ROOT).parts):

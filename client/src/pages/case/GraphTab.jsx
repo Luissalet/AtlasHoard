@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from "d3-force";
+import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force";
 import { api } from "../../api.js";
 import { go, useApp } from "../../App.jsx";
 import { useCase } from "../../components/caseContext.js";
@@ -9,24 +9,35 @@ import { STATUSES, STATUS_HEX, TYPE_COLORS } from "../../format.js";
 const W = 900;
 const H = 560;
 
+// The layout is settled off-screen (a fixed number of ticks) and then fitted to the canvas, so the first paint is already tidy.
 function useLayout(graph) {
-  const [pos, setPos] = useState({});
+  const [layout, setLayout] = useState({ pos: {}, fit: { x: 0, y: 0, k: 1 } });
   useEffect(() => {
-    if (!graph) return undefined;
+    if (!graph) return;
     const nodes = graph.nodes.map((n) => ({ ...n }));
     const links = graph.edges.map((e) => ({ ...e }));
+    const n = nodes.length;
     const sim = forceSimulation(nodes)
-      .force("link", forceLink(links).id((n) => n.id).distance(90).strength(0.5))
-      .force("charge", forceManyBody().strength(-260))
-      .force("collide", forceCollide(24))
-      .force("center", forceCenter(W / 2, H / 2));
-    let frame = 0;
-    const publish = () => { frame = 0; setPos(Object.fromEntries(nodes.map((n) => [n.id, [n.x, n.y]]))); };
-    sim.on("tick", () => { if (!frame) frame = requestAnimationFrame(publish); });
-    return () => { sim.stop(); if (frame) cancelAnimationFrame(frame); };
+      .force("link", forceLink(links).id((d) => d.id).distance(n < 12 ? 190 : 140).strength(0.4))
+      .force("charge", forceManyBody().strength(n < 12 ? -900 : -500))
+      .force("collide", forceCollide(46))
+      .force("center", forceCenter(W / 2, H / 2))
+      .force("gx", forceX(W / 2).strength(0.12))
+      .force("gy", forceY(H / 2).strength(0.16))
+      .stop();
+    for (let i = 0; i < 400; i += 1) sim.tick();
+    const xs = nodes.map((d) => d.x);
+    const ys = nodes.map((d) => d.y);
+    const pad = 90;
+    const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad, minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+    const k = Math.min(1.6, W / (maxX - minX), H / (maxY - minY));
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    setLayout({ pos: Object.fromEntries(nodes.map((d) => [d.id, [d.x, d.y]])), fit: { x: W / 2 - cx * k, y: H / 2 - cy * k, k } });
   }, [graph]);
-  return pos;
+  return layout;
 }
+
+const short = (text, n = 22) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
 
 export default function GraphTab() {
   const { t } = useApp();
@@ -42,9 +53,10 @@ export default function GraphTab() {
     [caseId, entityId, depth, statuses.join(","), asOf],
   );
   const g = data.data;
-  const pos = useLayout(g);
+  const { pos, fit } = useLayout(g);
   const byId = useMemo(() => Object.fromEntries((g?.nodes || []).map((n) => [n.id, n])), [g]);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
+  useEffect(() => { setView(fit); }, [fit]);
   const drag = useRef(null);
   const toggle = (s) => setStatuses(statuses.includes(s) ? statuses.filter((x) => x !== s) : [...statuses, s]);
   const edge = g?.edges.find((e) => e.id === sel?.edge);
@@ -62,7 +74,7 @@ export default function GraphTab() {
         </Field>
         <Field label={t("depth")}><input className="field" type="number" min="1" max="4" disabled={!entityId} value={depth} onChange={(e) => setDepth(Number(e.target.value) || 1)} /></Field>
         <Field label={t("as_of")}><input className="field" value={asOf} onChange={(e) => setAsOf(e.target.value)} placeholder="YYYY[-MM]" /></Field>
-        <div className="flex items-end"><button type="button" className="btn btn-sm" onClick={() => setView({ x: 0, y: 0, k: 1 })}>{t("reset_view")}</button></div>
+        <div className="flex items-end"><button type="button" className="btn btn-sm" onClick={() => setView(fit)}>{t("reset_view")}</button></div>
         <div className="flex flex-wrap gap-1.5 md:col-span-4">
           {STATUSES.map((s) => (
             <button key={s} type="button" className={statuses.includes(s) ? "btn btn-sm btn-active" : "btn btn-sm"} onClick={() => toggle(s)}>
@@ -91,8 +103,8 @@ export default function GraphTab() {
                     <g key={e.id} onClick={(ev) => { ev.stopPropagation(); setSel({ edge: e.id }); }} style={{ cursor: "pointer" }}>
                       <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={STATUS_HEX[e.status]} strokeWidth={active ? 4 : 1.5 + Math.min(3, e.evidence_count * 0.6)}
                         strokeDasharray={e.status === "claimed" || e.status === "unsupported" ? "5 4" : undefined} opacity={e.status === "retracted" ? 0.4 : 0.85} />
-                      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="transparent" strokeWidth="12" />
-                      <text x={(a[0] + b[0]) / 2} y={(a[1] + b[1]) / 2 - 3} fontSize="9" textAnchor="middle" fill="#8aa397">{e.label}</text>
+                      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="transparent" strokeWidth="12"><title>{e.label}</title></line>
+                      <text x={(a[0] + b[0]) / 2} y={(a[1] + b[1]) / 2 - 3} fontSize="9" textAnchor="middle" fill="#8aa397">{short(e.label, 34)}</text>
                     </g>
                   );
                 })}
@@ -103,7 +115,8 @@ export default function GraphTab() {
                   return (
                     <g key={n.id} transform={`translate(${p[0]} ${p[1]})`} onClick={(ev) => { ev.stopPropagation(); setSel({ node: n.id }); }} style={{ cursor: "pointer" }} opacity={dim ? 0.3 : 1}>
                       <circle r={8 + Math.min(10, n.degree * 1.5)} fill={TYPE_COLORS[n.type] || "#9fb0c3"} fillOpacity={n.private ? 0.25 : 0.8} stroke={n.center ? "#fff" : "#0c1812"} strokeWidth={n.center ? 3 : 1.5} strokeDasharray={n.private ? "3 2" : undefined} />
-                      <text y={-(12 + Math.min(10, n.degree * 1.5))} fontSize="11" textAnchor="middle" fill="#e6efe9">{n.name}</text>
+                      <text y={-(12 + Math.min(10, n.degree * 1.5))} fontSize="12" textAnchor="middle" fill="#e6efe9" style={{ paintOrder: "stroke" }} stroke="#0a120e" strokeWidth="3">{short(n.name)}</text>
+                      <title>{n.name}</title>
                     </g>
                   );
                 })}

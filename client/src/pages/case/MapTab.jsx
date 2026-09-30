@@ -6,6 +6,9 @@ import { useCase } from "../../components/caseContext.js";
 import { Empty, useAsync } from "../../components/ui.jsx";
 import { TYPE_COLORS, yearOf } from "../../format.js";
 
+// Light fills with a dark outline stay readable over the green and grey of the base map.
+const LIGHT_FILL = { person: "#ffe39a", organization: "#b9e3f7", place: "#d6f5dc", event: "#ffc1bc", document: "#dccdfb", object: "#ffd2b8", domain: "#b8f0e8", concept: "#e2e8ee" };
+
 export default function MapTab() {
   const { t } = useApp();
   const { caseId } = useCase();
@@ -39,8 +42,7 @@ export default function MapTab() {
     const points = [];
     d.layers.filter((layer) => !hidden.includes(layer.type)).forEach((layer) => {
       layer.features.forEach((f) => {
-        const color = TYPE_COLORS[layer.type] || "#9fb0c3";
-        const marker = L.circleMarker([f.lat, f.lon], { radius: 5 + Math.min(9, f.source_count * 2), color, fillColor: color, fillOpacity: 0.55, weight: 2 });
+        const marker = L.circleMarker([f.lat, f.lon], { radius: 10 + Math.min(8, f.source_count * 2), color: "#0b1a12", fillColor: LIGHT_FILL[layer.type] || "#f1f7f2", fillOpacity: 0.95, weight: 3 });
         const node = document.createElement("div");
         const title = document.createElement("strong");
         title.textContent = f.name;
@@ -51,12 +53,13 @@ export default function MapTab() {
         link.textContent = t("open");
         node.append(title, meta, link);
         marker.bindPopup(node);
-        marker.bindTooltip(f.name);
+        marker.bindTooltip(f.name, { permanent: true, direction: "right", offset: [12, 0], className: "map-label" });
         marker.addTo(group.current);
         points.push([f.lat, f.lon]);
       });
     });
-    if (points.length) map.current.fitBounds(points, { padding: [40, 40], maxZoom: 9 });
+    if (points.length === 1) map.current.setView(points[0], 11);
+    else if (points.length) map.current.fitBounds(points, { padding: [50, 50], maxZoom: 11 });
   }, [d, hidden, caseId, t]);
 
   const toggle = (type) => setHidden(hidden.includes(type) ? hidden.filter((x) => x !== type) : [...hidden, type]);

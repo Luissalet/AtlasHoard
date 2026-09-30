@@ -113,3 +113,5 @@ table.grid tr:hover td { background: #ffffff05; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 }
+.map-label { background: #0b1a12e6; border: 1px solid #28443a; color: #e6efe9; font-weight: 600; font-size: 12px; padding: 1px 6px; box-shadow: none; }
+.map-label::before { display: none; }

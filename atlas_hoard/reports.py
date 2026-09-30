@@ -23,7 +23,7 @@ T = {
         "question": "Question", "status": "Status", "summary": "Summary", "overview": "Overview", "entities": "Key entities",
         "relations": "Relations by status", "timeline": "Timeline", "gaps": "Gaps", "contradictions": "Contradictions",
         "ach": "Competing hypotheses", "open": "Open questions", "sources": "Sources", "private": "private person",
-        "uncited": "uncited", "none": "None.", "valid": "valid", "confidence": "confidence", "stale": "stale", "evidence": "evidence",
+        "uncited": "uncited", "none": "None.", "valid": "valid", "confidence": "confidence", "stale": "stale", "ended": "ended", "evidence": "evidence",
         "model": "model-written summary, citation-checked", "det": "deterministic summary", "generated": "Generated",
         "retracted": "RETRACTED", "hyp": "Hypothesis", "score": "inconsistency", "least": "least contradicted so far",
         "no_support": "No supported relations yet.", "cite_problem": "Citation check", "counts": "{s} active sources, {e} entities, {r} relations",
@@ -34,7 +34,7 @@ T = {
         "question": "Pregunta", "status": "Estado", "summary": "Resumen", "overview": "Panorama", "entities": "Entidades clave",
         "relations": "Relaciones por estado", "timeline": "Cronología", "gaps": "Huecos", "contradictions": "Contradicciones",
         "ach": "Hipótesis en competencia", "open": "Preguntas abiertas", "sources": "Fuentes", "private": "persona privada",
-        "uncited": "sin cita", "none": "Ninguna.", "valid": "vigente", "confidence": "confianza", "stale": "desactualizado", "evidence": "evidencia",
+        "uncited": "sin cita", "none": "Ninguna.", "valid": "vigente", "confidence": "confianza", "stale": "desactualizado", "ended": "terminado", "evidence": "evidencia",
         "model": "resumen redactado por un modelo, con citas comprobadas", "det": "resumen determinista", "generated": "Generado",
         "retracted": "RETRACTADA", "hyp": "Hipótesis", "score": "inconsistencia", "least": "la menos contradicha hasta ahora",
         "no_support": "Todavía no hay relaciones con respaldo.", "cite_problem": "Comprobación de citas",
@@ -216,6 +216,8 @@ def _md_relation(v: dict, t: dict) -> list[str]:
     if _valid_text(v):
         meta.append(f"{t['valid']} {_valid_text(v)}")
     meta.append(f"{t['confidence']} {v['confidence']:g}")
+    if v["ended"]:
+        meta.append(t["ended"])
     if v["stale"]:
         meta.append(f"⚑ {t['stale']}: {v['stale_reason']}")
     for f in v["flags"]:

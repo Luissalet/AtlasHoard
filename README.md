@@ -33,7 +33,8 @@ so the two cannot disagree.
 - **Retraction cascade**: retracting a source never deletes anything. Relations are recomputed, relations derived from
   an unsupported one are flagged, and the affected attributes and ACH hypotheses are listed.
 - **Timeline with `as_of`**: partial dates (`2024`, `2024-03`, `2024-03-05`) are treated as ranges of days; `as_of`
-  shows what was valid on a date. Gaps, stale facts and conflicting values of one-value predicates (for example two
+  shows what was valid on a date. A fact whose validity ended in the past is history (`ended`), not stale; `stale` is
+  reserved for facts that should still be current but were last observed more than `ATLAS_STALE_DAYS` ago. Gaps and conflicting values of one-value predicates (for example two
   headquarters at the same time) are reported.
 - **Map** (Leaflet, OpenStreetMap tiles): one layer per entity type, with the number of sources behind it and a time
   slider. **Graph** (d3-force): edges coloured by status, neighbourhood by depth.
@@ -109,10 +110,10 @@ from the running app and forwards each call. When the app is not running it star
 
 | tool | what it does |
 | --- | --- |
-| `atlas_status` | health and counts |
+| `atlas_status` | health and counts; the model probe is cached for 60 s and never blocks |
 | `case_create`, `case_list`, `case_get`, `case_update` | cases and their dashboard; delete with `action=delete` and `confirm=true` |
 | `source_add`, `source_get`, `source_retract`, `sources_search` | capture, read, retract/restore and search sources |
-| `entity_upsert`, `entity_get`, `entity_search`, `entity_merge`, `duplicates_suggest` | entities, duplicates and explicit merges |
+| `entity_upsert`, `entity_get`, `entity_search`, `entity_merge`, `duplicates_suggest` | entities, duplicates and explicit merges; `public_figure: true` (a parameter, not an attribute) lifts the private-person guard |
 | `relation_add`, `relation_update`, `relation_retract`, `relation_get` | relations with mandatory evidence; list by status, entity or `as_of` |
 | `timeline`, `map_layers`, `graph` | dated view, map layers, relation graph |
 | `hypothesis_add`, `ach_rate`, `ach_matrix` | competing hypotheses |

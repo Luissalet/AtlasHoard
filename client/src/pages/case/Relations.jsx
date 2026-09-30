@@ -70,7 +70,8 @@ function RelationRow({ r, sources, open, onToggle, onChanged }) {
           <b>{r.subject_name}</b> <span style={{ color: "var(--accent)" }}>{r.predicate_label}</span> <b>{r.object_name}</b>
           {(r.subject_private || r.object_private) && <span className="chip chip-amber ml-2">{t("private_person")}</span>}
           {r.flags.map((f) => <span key={f} className="chip chip-danger ml-1" title={f}>{t("derived_flag")}</span>)}
-          {r.stale && <span className="chip ml-1" title={r.stale_reason}>{t("stale")}</span>}
+          {r.ended && <span className="chip ml-1" title={t("ended_help")}>{t("ended")}</span>}
+          {r.stale && <span className="chip chip-amber ml-1" title={r.stale_reason}>{t("stale")}</span>}
           {!r.in_vocabulary && <span className="chip ml-1" title={t("free_predicate")}>{t("free_text")}</span>}
         </td>
         <td><StatusChip status={r.status} t={t} /></td>

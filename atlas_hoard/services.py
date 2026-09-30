@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 import secrets
+import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any, Callable
 
 from . import APP_ID, SERVICE, __version__
@@ -81,6 +83,10 @@ class Services:
                                                                               timeout_s=config.fetch_timeout_s), clock=clock_fn)
         self._family_call = family_call or (lambda app, tool, args: family.call(app, tool, args, timeout=30.0))
         self._emit = emit_fn
+        self._probe_lock = threading.Lock()
+        self._probe_cache: tuple[float, dict[str, Any]] | None = None
+        self._probe_future: Future | None = None
+        self._probe_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="atlas-model-probe")
 
     # ---------------- lifecycle ----------------
     def start(self) -> None:
@@ -92,6 +98,7 @@ class Services:
                 self.link_sync.close()
             except Exception:  # noqa: BLE001
                 pass
+        self._probe_pool.shutdown(wait=False, cancel_futures=True)
         self.db.close()
 
     # ---------------- events ----------------
@@ -161,11 +168,39 @@ class Services:
                 "entities": one("SELECT COUNT(*) c FROM entities WHERE merged_into IS NULL"),
                 "relations": one("SELECT COUNT(*) c FROM relations"), "hypotheses": one("SELECT COUNT(*) c FROM hypotheses")}
 
-    def status(self) -> dict[str, Any]:
+    MODEL_TTL_S = 60.0
+    MODEL_WAIT_S = 0.8
+
+    def model_status(self) -> dict[str, Any]:
+        """Model probe result, cached for 60 s. The probe runs in a worker thread; when it is slow (Faustus not reachable)
+        the caller gets the last known value, or a 'probing' marker the first time, instead of blocking."""
+        now = time.monotonic()
+        with self._probe_lock:
+            cached = self._probe_cache
+            if cached is not None and now - cached[0] < self.MODEL_TTL_S:
+                return cached[1]
+            if self._probe_future is None or self._probe_future.done():
+                self._probe_future = self._probe_pool.submit(self._probe_model)
+            future = self._probe_future
         try:
-            model = self.link_sync.status()
+            value = future.result(timeout=self.MODEL_WAIT_S)
+        except Exception:  # noqa: BLE001 - timeout: the probe keeps running and fills the cache when it ends
+            with self._probe_lock:
+                stale = self._probe_cache
+            return stale[1] if stale else {"state": "probing", "note": "the model probe is still running; ask again in a few seconds"}
+        return value
+
+    def _probe_model(self) -> dict[str, Any]:
+        try:
+            value = self.link_sync.status()
         except Exception as error:  # noqa: BLE001
-            model = {"error": f"{type(error).__name__}: {error}"}
+            value = {"error": f"{type(error).__name__}: {error}"}
+        with self._probe_lock:
+            self._probe_cache = (time.monotonic(), value)
+        return value
+
+    def status(self) -> dict[str, Any]:
+        model = self.model_status()
         return {"service": SERVICE, "version": __version__, "counts": self.counts(), "model": model,
                 "geocode": self.get_settings()["geocode"], "family": {**family.status(), "sources": self.family_sources()},
                 "uptime_s": int(time.time() - self.started_at), "db": str(self.config.db_path) if self.config.data_dir_configured else "data/atlas.db"}

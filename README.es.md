@@ -27,7 +27,9 @@ herramientas MCP, construidas con el mismo código, de modo que no pueden contra
 - **Cascada de retractación**: retirar una fuente no borra nada. Se recalculan las relaciones, se marcan las derivadas
   de una relación sin apoyo y se listan los atributos e hipótesis afectados.
 - **Cronología con `as_of`**: las fechas parciales (`2024`, `2024-03`, `2024-03-05`) se tratan como rangos de días;
-  `as_of` muestra lo vigente en una fecha. Se señalan huecos, hechos antiguos y valores incompatibles de predicados de
+  `as_of` muestra lo vigente en una fecha. Un hecho cuya vigencia terminó en el pasado es historia (`ended`,
+  «terminado»), no un dato desactualizado; `stale` se reserva para hechos que deberían seguir vigentes pero cuya
+  última observación supera `ATLAS_STALE_DAYS`. Se señalan huecos y valores incompatibles de predicados de
   valor único (por ejemplo dos sedes a la vez).
 - **Mapa** (Leaflet, teselas de OpenStreetMap) con una capa por tipo de entidad, fuentes detrás de cada capa y
   deslizador temporal. **Grafo** (d3-force) con aristas coloreadas por estado y vecindad por profundidad.
@@ -100,7 +102,7 @@ cualquier cliente MCP:
 
 | herramienta | qué hace |
 | --- | --- |
-| `atlas_status` | salud y recuentos |
+| `atlas_status` | salud y recuentos; la sonda del modelo se guarda 60 s y nunca bloquea |
 | `case_create`, `case_list`, `case_get`, `case_update` | casos y su panel; borrar con `action=delete` y `confirm=true` |
 | `source_add`, `source_get`, `source_retract`, `sources_search` | capturar, leer, retirar o restaurar y buscar fuentes |
 | `entity_upsert`, `entity_get`, `entity_search`, `entity_merge`, `duplicates_suggest` | entidades, duplicados y fusiones explícitas |

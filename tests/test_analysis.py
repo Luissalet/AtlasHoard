@@ -279,3 +279,47 @@ def test_report_json_sections_paging_and_language(services, case):
     en = reports.report(services, cid, format="markdown", lang="en", use_model=False)
     assert es["lang"] == "es" and es["markdown"] != en["markdown"]
     assert json.dumps(reports.report(services, cid, format="json", use_model=False))  # serialisable
+
+
+def test_report_separates_ended_from_stale(services):
+    c = cases.create(services, title="Historia")["case"]
+    s = sources.add(services, case_id=c["id"], kind="text", text="The bridge was built between 1881 and 1889.", origin="h.example", published_at="1999-01-01")["source"]
+    a = entities.upsert(services, case_id=c["id"], type="organization", name="Builders")["entity"]
+    b = entities.upsert(services, case_id=c["id"], type="place", name="Bridge")["entity"]
+    relations.add(services, case_id=c["id"], subject=a["id"], predicate="built", object=b["id"], valid_from="1881", valid_to="1889", observed_at="1999-01-01",
+                  evidence=[{"source_id": s["id"], "quote": "built between 1881 and 1889"}])
+    es = reports.report(services, c["id"], lang="es", use_model=False)["markdown"]
+    en = reports.report(services, c["id"], lang="en", use_model=False)["markdown"]
+    assert "terminado" in es and "desactualizado" not in es and "ended" in en and "stale" not in en
+    g = timeline.graph(services, c["id"])
+    assert g["edges"][0]["ended"] is True and g["edges"][0]["stale"] is False
+    tl = timeline.timeline(services, c["id"])
+    assert all(e["stale"] is False for e in tl["entries"] if e["kind"] != "event")
+
+
+def test_status_does_not_block_on_a_slow_model_probe(tmp_path):
+    import time
+    from conftest import FakeLink, make_services
+
+    class Slow(FakeLink):
+        calls = 0
+
+        def status(self):
+            Slow.calls += 1
+            time.sleep(2.0)
+            return super().status()
+
+    svc = make_services(tmp_path, link=Slow())
+    svc.start()
+    try:
+        t0 = time.monotonic()
+        first = svc.status()
+        assert time.monotonic() - t0 < 1.5 and first["model"]["state"] == "probing"
+        time.sleep(2.3)  # the probe finishes in the background and fills the cache
+        t0 = time.monotonic()
+        second = svc.status()
+        assert time.monotonic() - t0 < 0.2 and second["model"]["llm"]["state"] == "resolved"
+        svc.status()
+        assert Slow.calls == 1  # cached for 60 s
+    finally:
+        svc.stop()

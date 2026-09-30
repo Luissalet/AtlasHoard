@@ -145,3 +145,9 @@ def test_deletes_need_confirm(services, case):
         at.call_tool(services, "entity_upsert", {"case_id": case["case"]["id"], "entity_id": case["jane"]["id"], "action": "delete", "confirm": True})
     out = at.call_tool(services, "entity_upsert", {"case_id": case["case"]["id"], "entity_id": lone["id"], "action": "delete", "confirm": True})
     assert out["deleted"] is True
+
+
+def test_entity_upsert_description_names_the_privacy_parameter():
+    spec = next(t for t in at.tool_catalog() if t["name"] == "entity_upsert")
+    assert "public_figure=true" in spec["description"] and "never an attribute" in spec["description"]
+    assert "not an attribute" in spec["inputSchema"]["properties"]["public_figure"]["description"]

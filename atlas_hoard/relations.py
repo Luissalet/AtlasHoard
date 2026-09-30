@@ -226,11 +226,11 @@ def _observed(row, ev) -> str | None:
 
 def staleness(svc, row, ev) -> tuple[bool, str]:
     today = iso_day(svc.clock())
+    """Stale means: still meant to be current (no end, or an end in the future) but last observed long ago.
+    A fact that ended in the past is history, not stale: see ``ended``."""
     end = dates.end_day(row["valid_to"])
     now_day = date.fromisoformat(today)
-    if end is not None and end < now_day:
-        return True, f"valid_to {row['valid_to']} is in the past"
-    if end is None:
+    if end is None or end >= now_day:
         obs = _observed(row, ev)
         od = dates.start_day(obs) if obs else None
         if od is not None and (now_day - od).days > svc.config.stale_days:
@@ -269,6 +269,7 @@ def view(svc, row, *, with_evidence: bool = True, flags: dict | None = None, quo
         "derived_from": jload(row["derived_from"], []), "flags": fl,
         "evidence_count": len(active), "evidence_total": len(ev), "independent_sources": independent_origins(ev),
         "stale": stale, "stale_reason": reason,
+        "ended": bool((e := dates.end_day(row["valid_to"])) is not None and e < date.fromisoformat(iso_day(svc.clock()))),
         "current": dates.contains(row["valid_from"], row["valid_to"], iso_day(svc.clock())),
         "cite": " ".join(sorted({f"[S{r['source_id']}]" for r in active}, key=lambda c: int(c[2:-1]))),
     }
@@ -510,7 +511,7 @@ def update(svc, relation_id: int, *, subject: int | str | None = None, predicate
         return {"updated": False, "relation": get(svc, relation_id), "changed": []}
     change = recompute_relation(svc, relation_id, reason or "edited")
     after = view(svc, get_row(svc, relation_id), with_evidence=False)
-    changed = [k for k in after if k not in ("evidence_count", "evidence_total", "cite", "current", "stale", "stale_reason", "label",
+    changed = [k for k in after if k not in ("evidence_count", "evidence_total", "cite", "current", "ended", "stale", "stale_reason", "label",
                                               "subject_name", "object_name", "flags", "independent_sources", "observed_at")
                and before.get(k) != after.get(k)]
     history.record(svc, case_id, "relation.updated", "relation", relation_id,

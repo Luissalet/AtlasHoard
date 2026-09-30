@@ -85,6 +85,9 @@ def _coerce_attributes(svc, case_id: int, raw: dict[str, Any], observed: str | N
         key = str(key).strip()
         if not key:
             raise AtlasError("Attribute names cannot be empty.")
+        if key.lower().replace(" ", "_").replace("-", "_") in ("public_figure", "private_person"):
+            raise AtlasError(f"'{key}' is not an attribute: pass public_figure=true (or false) as a parameter of entity_upsert; "
+                             "it is the switch that lifts the private-person guard for a person with a documented public role.")
         if isinstance(spec, dict) and "value" in spec:
             value = spec["value"]
             ids = spec.get("source_ids") or ([spec["source_id"]] if spec.get("source_id") is not None else [])

@@ -244,7 +244,18 @@ def test_staleness(services, c):
     assert relations.get(services, old["id"])["stale"] is True and relations.get(services, old["id"])["stale_reason"]
     ended = relations.add(services, case_id=c["id"], subject=b["id"], predicate="located_in", object=a["id"], valid_to="2020", observed_at="2026-09-01",
                           evidence=[{"source_id": s["id"], "locator": "2"}])["relation"]
-    assert relations.get(services, ended["id"])["stale"] is True  # valid_to is in the past
+    v = relations.get(services, ended["id"])
+    assert v["ended"] is True and v["stale"] is False and v["current"] is False  # history is not staleness
+    old_history = relations.add(services, case_id=c["id"], subject=a["id"], predicate="owns", object=b["id"], valid_from="1881", valid_to="1889",
+                                observed_at="2001-01-01", evidence=[{"source_id": s["id"], "locator": "h"}])["relation"]
+    v = relations.get(services, old_history["id"])
+    assert v["ended"] is True and v["stale"] is False  # built 1881-1889, observed long ago: still not stale
+    future = relations.add(services, case_id=c["id"], subject=b["id"], predicate="owns", object=a["id"], valid_to="2040", observed_at="2015-01-01",
+                           evidence=[{"source_id": s["id"], "locator": "f"}])["relation"]
+    v = relations.get(services, future["id"])
+    assert v["ended"] is False and v["stale"] is True  # meant to be current, never refreshed
+    dash = cases.get(services, c["id"])["dashboard"]["stale_facts"]
+    assert {x["id"] for x in dash} == {old["id"], future["id"]}
     recent = relations.add(services, case_id=c["id"], subject=a["id"], predicate="owns", object=b["id"], observed_at="2026-09-01",
                            evidence=[{"source_id": s["id"], "locator": "3"}])["relation"]
     assert relations.get(services, recent["id"])["stale"] is False
@@ -274,3 +285,11 @@ def test_functional_predicate_conflict_and_timeline_gaps(services, c):
     lyon_only = timeline.timeline(services, c["id"], as_of="2011")
     active = [e["label"] for e in lyon_only["entries"] if e.get("active_at_as_of")]
     assert any("Lyon" in x for x in active) and not any("Paris" in x and "headquartered" in x for x in active)
+
+
+def test_attribute_keys_cannot_carry_the_privacy_switch(services, c):
+    for key in ("public_figure", "Private Person", "private-person"):
+        with pytest.raises(AtlasError, match="public_figure=true"):
+            entities.upsert(services, case_id=c["id"], type="person", name="X Y", attributes={key: True})
+    ok = entities.upsert(services, case_id=c["id"], type="person", name="X Y", public_figure=True)["entity"]
+    assert ok["private_person"] is False and "public_figure" not in ok["attributes"]

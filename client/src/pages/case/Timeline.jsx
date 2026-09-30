@@ -81,6 +81,7 @@ export default function Timeline() {
                   <span className="chip">{kindLabel[row.entry.kind]}</span>
                   <span>{row.entry.label}</span>
                   <StatusChip status={row.entry.status} t={t} />
+                  {row.entry.ended && row.entry.kind !== "relation_end" && <span className="chip">{t("ended")}</span>}
                   {row.entry.stale && <span className="chip chip-amber">{t("stale")}</span>}
                   <span className="mono help">{row.entry.cite}</span>
                 </>

@@ -126,7 +126,7 @@ class EntityUpsertArgs(BaseModel):
     date_start: Optional[str] = Field(None, max_length=10)
     date_end: Optional[str] = Field(None, max_length=10)
     wikidata_qid: Optional[str] = Field(None, max_length=20)
-    public_figure: Optional[bool] = Field(None, description="A person is private unless this is true.")
+    public_figure: Optional[bool] = Field(None, description="Top-level parameter (not an attribute): a person is private unless this is true; it lifts the private-person guard for enrichers.")
     private_person: Optional[bool] = None
 
 
@@ -514,7 +514,8 @@ TOOLS: list[Tool] = [
         SourcesSearchArgs, _ann(True), run_sources_search),
     Tool("entity_upsert",
         "Create or edit an entity (person, organization, place, event...) with aliases, geo, dates. Entidad.\n"
-        "Matched by name+type, so repeated calls do not duplicate; persons are private unless public_figure=true. "
+        "Matched by name+type, so repeated calls do not duplicate; persons are private unless the parameter public_figure=true is passed "
+        "(a top-level parameter, never an attribute; it lifts the guard that blocks enrichers). "
         "action=delete needs confirm. Returns possible duplicates.\nSinónimos: crear entidad, persona, organización, lugar, evento, alias, coordenadas.\n"
         "Keywords: entity, upsert, person, organisation, place, event, aliases.",
         EntityUpsertArgs, _ann(False, True, True), run_entity_upsert),

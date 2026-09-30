@@ -94,7 +94,7 @@ def timeline(svc, case_id: int, *, entity_id: int | None = None, types: list[str
         if not type_ok(v["subject_id"], v["object_id"]):
             continue
         base = {"relation_id": v["id"], "label": v["label"], "status": v["status"], "predicate": v["predicate"],
-                "flags": v["flags"], "stale": v["stale"], "evidence_count": v["evidence_count"], "cite": v["cite"]}
+                "flags": v["flags"], "stale": v["stale"], "ended": v["ended"], "evidence_count": v["evidence_count"], "cite": v["cite"]}
         if v["valid_from"]:
             entries.append({"kind": "relation_start", "date": v["valid_from"], **base})
         if v["valid_to"]:
@@ -262,7 +262,7 @@ def graph(svc, case_id: int, *, entity_id: int | None = None, depth: int = 1, st
         "nodes": nodes,
         "edges": [{"id": v["id"], "source": v["subject_id"], "target": v["object_id"], "predicate": v["predicate"], "label": v["label"],
                    "status": v["status"], "confidence": v["confidence"], "evidence_count": v["evidence_count"],
-                   "valid_from": v["valid_from"], "valid_to": v["valid_to"], "stale": v["stale"], "flags": v["flags"], "cite": v["cite"]}
+                   "valid_from": v["valid_from"], "valid_to": v["valid_to"], "stale": v["stale"], "ended": v["ended"], "flags": v["flags"], "cite": v["cite"]}
                   for v in edges],
         "status_legend": list(relations_mod.STATUSES),
     }

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-hoard"
+version = "0.1.0"
+description = "Shared local filesystem projects for the Hoard family"
+requires-python = ">=3.11"
+dependencies = []
+license = {text = "MIT"}
+
+[tool.setuptools.packages.find]
+include = ["atlas_hoard*"]
+
+[tool.setuptools.package-data]
+"atlas_hoard" = ["ui/*"]
+"atlas_hoard.hoard_link" = ["ui/*.css", "_data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

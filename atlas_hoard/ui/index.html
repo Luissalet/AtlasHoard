@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es" data-hoard-app="atlas">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas's Hoard</title>
+<link rel="stylesheet" href="/hoard-theme.css"><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="app-header"><div><h1>Atlas's Hoard</h1><p>El disco compartido de la familia</p></div><button id="new-project" type="button">Nuevo proyecto</button></header>
+<p id="message" role="status" aria-live="polite" hidden></p>
+<section id="create-panel" class="form-panel" hidden aria-labelledby="create-title">
+<h2 id="create-title">Crear un proyecto compartido</h2>
+<form id="create-form"><label>Nombre<input name="name" required maxlength="200" placeholder="Por ejemplo, lanzamiento de la colección"></label>
+<label>Hoard responsable<input name="owner" required value="faustus" maxlength="60"></label>
+<label>Hoards que participan<input name="members" placeholder="writer, prospero, lumiere" maxlength="1000"><small>Sus archivos usarán la misma carpeta compartida.</small></label>
+<label>Ámbito<select name="sphere"><option value="personal">Personal</option><option value="work">Trabajo</option><option value="freelance">Autónomo</option></select></label>
+<label class="wide">Objetivo<input name="goal" maxlength="2000" placeholder="Qué quieres conseguir con este proyecto"></label>
+<div class="form-actions"><button type="submit">Crear proyecto</button><button type="button" id="cancel-create" class="quiet">Cancelar</button></div></form></section>
+<div class="workspace"><aside><h2>Proyectos</h2><nav id="projects" aria-label="Proyectos compartidos"></nav><p class="disk-label">Carpeta del disco</p><p id="disk-root" class="path"></p></aside>
+<main id="main"><section class="empty"><h2>Una carpeta para trabajar juntos</h2><p>Crea un proyecto para guardar archivos compartidos y los proyectos nativos de cada Hoard.</p><p>Las aplicaciones abrirán el mismo archivo desde la misma ruta.</p></section></main></div>
+</body></html>

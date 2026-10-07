@@ -14,7 +14,16 @@ derived results. Cache reuse requires exact source/output hashes and recipes.
 Lumiere's `media_shared` opens live files without copying them and refreshes
 changed originals while preserving timeline references.
 
-Existing applications' native databases and copying importers remain unchanged.
+Register project files normally with `atlas_file_register`. For a file that
+must stay in another folder, the operator can use `atlas_file_link_source` to
+add an explicit read-only reference; Atlas records its absolute path, size and
+SHA-256 revision without copying it. `atlas_file_resolve` refreshes the source
+revision after edits, and project context marks the reference as read-only.
+Linked sources cannot be published as derived outputs. `atlas_file_import`
+remains the explicit one-time copy operation. Existing applications' native
+databases and copying importers remain unchanged.
+See [external source references](docs/EXTERNAL-SOURCES.md) for the MCP contract
+and its filesystem limits.
 Membership restricts the API, not OS filesystem access. No automatic migration,
 continuous watcher or cloud dependency. BookHoard and WatchHoard are independent.
 

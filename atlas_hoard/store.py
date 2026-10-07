@@ -111,6 +111,15 @@ class Workspace:
               result TEXT NOT NULL, PRIMARY KEY(caller, request_id));
             CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         """)
+        # Additive migration: existing project files remain ordinary in-project entries.
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(files)")}
+        if "external_path" not in columns:
+            self.db.execute("ALTER TABLE files ADD COLUMN external_path TEXT")
+        if "external_key" not in columns:
+            self.db.execute("ALTER TABLE files ADD COLUMN external_key TEXT")
+        if "input_readonly" not in columns:
+            self.db.execute("ALTER TABLE files ADD COLUMN input_readonly INTEGER NOT NULL DEFAULT 0")
+        self.db.execute("CREATE UNIQUE INDEX IF NOT EXISTS files_external_key ON files(project_id, external_key) WHERE external_key IS NOT NULL")
         configured = self.db.execute("SELECT value FROM settings WHERE key='root'").fetchone()
         if configured and configured[0] != str(self.root):
             self.db.close()
@@ -158,9 +167,18 @@ class Workspace:
                 "hoard_paths": {a: str(self._folder(row) / "hoards" / a) for a in json.loads(row["members"])}}
 
     def _file_view(self, row, project):
-        path = self._path(project, row["relative_path"], must_exist=False)
-        return {**dict(row), "path": str(path), "uri": f"hoard://atlas/file/{row['id']}",
-                "exists": path.is_file(), "live_file": True}
+        external_path = row["external_path"]
+        path = Path(external_path) if external_path else self._path(project, row["relative_path"], must_exist=False)
+        view = dict(row)
+        view.pop("external_path", None)
+        view.pop("external_key", None)
+        view.pop("input_readonly", None)
+        view.update({"path": str(path), "uri": f"hoard://atlas/file/{row['id']}",
+                     "exists": path.is_file(), "live_file": True})
+        if external_path:
+            view["relative_path"] = None
+            view.update({"external": True, "input_readonly": True, "source_path": str(path)})
+        return view
 
     def _file(self, file_id, caller, project_id=None):
         row = self.db.execute("SELECT * FROM files WHERE id=?", (str(file_id),)).fetchone()
@@ -172,7 +190,8 @@ class Workspace:
         return row, project
 
     def _refresh(self, row, project):
-        path = self._path(project, row["relative_path"], must_exist=False)
+        external_path = row["external_path"]
+        path = Path(external_path) if external_path else self._path(project, row["relative_path"], must_exist=False)
         if not path.is_file():
             self.db.execute("UPDATE files SET state='missing', updated=? WHERE id=?", (time.time(), row["id"]))
         else:
@@ -295,7 +314,8 @@ class Workspace:
                             (revision, size, mtime, time.time(), uid))
         else:
             uid = secrets.token_hex(8)
-            self.db.execute("INSERT INTO files VALUES (?,?,?,?,?,?,?,?, 'available',?)",
+            self.db.execute("INSERT INTO files (id,project_id,relative_path,app,title,revision,size,mtime_ns,state,updated) "
+                            "VALUES (?,?,?,?,?,?,?,?,'available',?)",
                             (uid, project["id"], relative, app, title or path.name, revision, size, mtime, time.time()))
         return self._file_view(self.db.execute("SELECT * FROM files WHERE id=?", (uid,)).fetchone(), project)
 
@@ -316,8 +336,50 @@ class Workspace:
 
     def file_resolve(self, args, caller):
         row, project = self._file(args.get("file_id"), caller)
+        previous_revision = row["revision"]
         row = self._refresh(row, project)
-        return {"ok": True, "file": self._file_view(row, project)}
+        result = {"ok": True, "file": self._file_view(row, project)}
+        if row["external_path"]:
+            result["changed"] = row["revision"] != previous_revision
+        return result
+
+    def file_link_source(self, args, caller):
+        """Register an external file as a read-only live input without copying it."""
+        def link():
+            if caller not in ADMIN:
+                raise StoreError("only the operator may link an external source", 403)
+            project = self._project(args.get("project_id"), caller)
+            raw_path = clean_user_path(args.get("source_path"))
+            source = Path(raw_path)
+            if not source.is_absolute():
+                raise StoreError("source_path must be an absolute path")
+            source = source.resolve()
+            if not source.is_file():
+                raise StoreError("source_path must name an existing file", 404)
+            if is_inside(source, self._folder(project)):
+                raise StoreError("source is already inside this project; use file_register")
+            bad = unsafe_file(source, lang="en")
+            if bad:
+                raise StoreError(bad)
+            revision, size, mtime = digest(source)
+            normalized = os.path.normcase(str(source))
+            existing = self.db.execute("SELECT id FROM files WHERE project_id=? AND external_key=?",
+                                       (project["id"], normalized)).fetchone()
+            if existing:
+                raise StoreError("source is already linked to this project", 409)
+            uid = secrets.token_hex(8)
+            relative = "@external/" + uid
+            title = text(args.get("title", source.name), "title", 200, required=True)
+            app = app_id(args.get("app") or project["owner"])
+            if app not in json.loads(project["members"]):
+                raise StoreError("application is not a project member", 403)
+            self.db.execute("INSERT INTO files (id,project_id,relative_path,app,title,revision,size,mtime_ns,state,updated,external_path,external_key,input_readonly) "
+                            "VALUES (?,?,?,?,?,?,?,?,'available',?,?,?,1)",
+                            (uid, project["id"], relative, app, title, revision, size, mtime, time.time(), str(source), normalized))
+            row = self.db.execute("SELECT * FROM files WHERE id=?", (uid,)).fetchone()
+            return {"ok": True, "file": self._file_view(row, project), "source_revision": revision,
+                    "source_size": size, "source_path": str(source), "input_readonly": True}
+        return self._mutate("atlas_file_link_source", args, caller, link)
 
     def file_import(self, args, caller):
         """Explicit one-time copy into shared storage; native work thereafter uses that path."""
@@ -378,6 +440,8 @@ class Workspace:
             if expected != {source["id"]: source["revision"] for source in sources}:
                 raise StoreError("sources changed or expected revisions were not supplied; regenerate the result", 409)
             output, _ = self._file(args.get("output_id"), caller, project["id"])
+            if output["external_path"]:
+                raise StoreError("a linked external source is read-only and cannot be published as an output", 400)
             output = self._refresh(output, project)
             if output["state"] != "available":
                 raise StoreError("output file is missing", 409)
@@ -424,6 +488,7 @@ class Workspace:
                     "atlas_projects": self.project_list, "atlas_project": self.project_get,
                     "atlas_location": self.location, "atlas_file_register": self.file_register,
                     "atlas_file_resolve": self.file_resolve, "atlas_file_import": self.file_import,
+                    "atlas_file_link_source": self.file_link_source,
                     "atlas_derived_publish": self.derived_publish, "atlas_derived_lookup": self.derived_lookup,
                     "atlas_context": self.context}
         if tool not in handlers:

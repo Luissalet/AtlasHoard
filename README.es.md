@@ -27,6 +27,16 @@ una instalación con proyectos sin hacer una migración explícita.
 4. Los participantes resuelven ese mismo archivo por su ID. No reciben una copia.
 5. Cada pestaña de Hoard tiene una carpeta para sus propios archivos de proyecto.
 
+Para un original que debe permanecer en otra carpeta, el operador puede usar
+`atlas_file_link_source` para crear una referencia explícita de solo lectura.
+Atlas conserva su ruta absoluta, tamaño y revisión SHA-256 sin copiarlo.
+`atlas_file_resolve` actualiza la revisión después de los cambios y el contexto
+del proyecto marca la referencia como entrada de solo lectura. No se puede
+publicar una fuente enlazada como resultado derivado. `atlas_file_import` sigue
+siendo la operación explícita para hacer una copia única.
+Consulta [referencias a fuentes externas](docs/EXTERNAL-SOURCES.es.md) para el
+contrato MCP y sus límites de acceso al sistema de archivos.
+
 ```text
 HoardStorage/
   coleccion-de-otono-<id>/
@@ -56,7 +66,8 @@ No hay repositorio público de Atlas inventado en el catálogo de descarga.
 - Hub: `hub_workspace`, `GET /api/workspace/projects` y
   `POST /api/workspace/call`.
 - Atlas: catálogo `/api/agent/tools`, llamadas `/api/agent/call`, y puente MCP
-  `mcp_server.py`. Son las mismas once herramientas.
+  `mcp_server.py`. Comparten el catálogo, incluida la herramienta para enlazar
+  fuentes externas de solo lectura.
 
 Configura el cliente común con el token propio de la aplicación, nunca con el
 de Atlas. Las respuestas incluyen `path`, `uri`, `project_id` y la revisión

@@ -42,7 +42,29 @@ def test_health_is_public_catalogue_and_calls_are_authenticated(app):
     assert http(base, "/api/agent/tools")[0] == 401
     assert http(base, "/api/agent/call", {"name": "atlas_projects"})[0] == 401
     code, body, _ = http(base, "/api/agent/tools", headers={"Authorization": "Bearer operator-token"})
-    assert code == 200 and len(json.loads(body)["tools"]) == 11
+    tools = json.loads(body)["tools"]
+    assert code == 200 and len(tools) == 12
+    linked = next(tool for tool in tools if tool["name"] == "atlas_file_link_source")
+    assert linked["inputSchema"]["required"] == ["project_id", "source_path"]
+
+
+def test_external_file_link_and_resolve_are_available_through_agent_mcp_endpoint(app, tmp_path):
+    base, store = app
+    project = store.dispatch("atlas_project_create", {"name": "External refs", "owner": "writer"})["project"]
+    source = tmp_path / "outside-reference.pdf"
+    source.write_bytes(b"fixture pdf")
+    headers = {"Authorization": "Bearer operator-token"}
+    create = {"name": "atlas_file_link_source", "caller": "hub", "arguments": {
+        "project_id": project["id"], "source_path": str(source)}}
+    code, raw, _ = http(base, "/api/agent/call", create, headers)
+    assert code == 200, raw
+    result = json.loads(raw)["result"]
+    assert result["input_readonly"] is True and result["file"]["external"] is True
+    file_id = result["file"]["id"]
+    code, raw, _ = http(base, "/api/agent/call", {"name": "atlas_file_resolve", "caller": "writer",
+        "arguments": {"file_id": file_id}}, headers)
+    assert code == 200 and json.loads(raw)["result"]["file"]["path"] == str(source.resolve())
+    assert source.read_bytes() == b"fixture pdf"
 
 
 def test_browser_session_uses_same_origin_and_cannot_choose_another_caller(app):

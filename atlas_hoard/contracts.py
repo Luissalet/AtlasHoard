@@ -23,6 +23,8 @@ def catalogue():
          {**PROJECT, "relative_path": field(), "app": field(), "title": field(), **RECEIPT}, ["project_id", "relative_path"], False),
         ("atlas_file_resolve", "Resolve the live path and refresh its content revision. Missing/changed files are reported honestly; never rewrites them.",
          {"file_id": field()}, ["file_id"], False),
+        ("atlas_file_link_source", "Operator-only: register an explicit external file as a read-only live input; records its path and hash without copying it. Changed sources refresh to a new revision.",
+         {**PROJECT, "source_path": field(description="Absolute path to an existing source file outside the project."), "app": field(), "title": field(), **RECEIPT}, ["project_id", "source_path"], False),
         ("atlas_file_import", "Operator-only: copy one explicit external file into shared storage once. Never moves the source or overwrites an existing destination.",
          {**PROJECT, "source_path": field(), "name": field(), **RECEIPT}, ["project_id", "source_path"], False),
         ("atlas_derived_publish", "Register a reusable result file with exact source revisions and processing recipe. Does not perform OCR, transcription or model inference.",

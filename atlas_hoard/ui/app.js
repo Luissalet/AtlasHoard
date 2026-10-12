@@ -53,12 +53,14 @@ function fileFormSnapshot() {
 async function copilotContext() {
   const CC = globalThis.atlasCopilotContext;
   try {
+    // Everything mutable is captured before the first await: navigating while the fetch is pending must not mix two views.
+    const openId = selected, openArea = area;
     const editor = CC.editorContext(window);
     let view = null;
-    if (selected) { try { view = await call("project", {project_id: selected}); } catch (e) { view = null; } }
-    const prefix = area === "shared" ? "shared/" : `hoards/${area}/`;
+    if (openId) { try { view = await call("project", {project_id: openId}); } catch (e) { view = null; } }
+    const prefix = openArea === "shared" ? "shared/" : `hoards/${openArea}/`;
     const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix)) : [];
-    return CC.buildContext({view, area, files, editor});
+    return CC.buildContext({view, area: openArea, files, editor});
   } catch (e) { return {active_objects: [], view: {page: "home"}}; }
 }
 if (typeof window !== "undefined" && globalThis.atlasCopilotContext) {

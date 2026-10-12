@@ -11,6 +11,7 @@ from . import __version__
 from .contracts import catalogue
 from .store import StoreError
 from .hoard_link import family
+from .hoard_link.copilot import COPILOT_PUBLIC_PATHS
 from .hoard_link.copilot_stdlib import CopilotRelay
 
 UI = Path(__file__).parent / "ui"
@@ -32,7 +33,7 @@ def make_server(store, token, port=0):
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+            self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'")
             if cookie:
                 self.send_header("Set-Cookie", f"atlas_session={session}; HttpOnly; SameSite=Strict; Path=/")
             self.end_headers()
@@ -69,7 +70,7 @@ def make_server(store, token, port=0):
             if path == "/api/health":
                 return self.reply({"ok": True, **family.health_block(), "service": "atlas-hoard", "version": __version__})
             if path.startswith("/api/copilot/"):
-                if path != "/api/copilot/launcher.js" and not self.authorized():
+                if path not in COPILOT_PUBLIC_PATHS and not self.authorized():
                     return self.reply({"ok": False, "error": "authentication required"}, 401)
                 if relay.handle(self):
                     return None

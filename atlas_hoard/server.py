@@ -11,6 +11,7 @@ from . import __version__
 from .contracts import catalogue
 from .store import StoreError
 from .hoard_link import family
+from .hoard_link.copilot_stdlib import CopilotRelay
 
 UI = Path(__file__).parent / "ui"
 MAX_BODY = 256 * 1024
@@ -18,6 +19,7 @@ MAX_BODY = 256 * 1024
 
 def make_server(store, token, port=0):
     session = secrets.token_urlsafe(32)
+    relay = CopilotRelay("atlas", store.data_dir, app_name="Atlas's Hoard")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -66,8 +68,13 @@ def make_server(store, token, port=0):
             path = urlsplit(self.path).path
             if path == "/api/health":
                 return self.reply({"ok": True, **family.health_block(), "service": "atlas-hoard", "version": __version__})
+            if path.startswith("/api/copilot/"):
+                if path != "/api/copilot/launcher.js" and not self.authorized():
+                    return self.reply({"ok": False, "error": "authentication required"}, 401)
+                if relay.handle(self):
+                    return None
             if path == "/":
-                return self.reply((UI / "index.html").read_bytes(), content_type="text/html; charset=utf-8", cookie=True)
+                return self.reply(relay.inject_html((UI / "index.html").read_bytes()), content_type="text/html; charset=utf-8", cookie=True)
             static = {"/icon.png": (UI / "icon.png", "image/png"),
                       "/app.js": (UI / "app.js", "text/javascript; charset=utf-8"),
                       "/copilot-context.js": (UI / "copilot-context.js", "text/javascript; charset=utf-8"),
@@ -89,6 +96,10 @@ def make_server(store, token, port=0):
             if not self.same_origin() or not identity:
                 self.close_connection = True
                 return self.reply({"ok": False, "error": "request refused"}, 403 if identity else 401)
+            if urlsplit(self.path).path == "/api/copilot/proxy":
+                relay.handle(self)
+                self.close_connection = True
+                return None
             if urlsplit(self.path).path != "/api/agent/call":
                 return self.reply({"ok": False, "error": "not found"}, 404)
             try:

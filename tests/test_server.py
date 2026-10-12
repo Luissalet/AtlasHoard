@@ -88,3 +88,12 @@ def test_shared_contract_carries_attested_caller_and_enforces_membership(app):
     # An old Hub must fail closed rather than silently elevating a sibling to
     # the Atlas operator when it omits the authenticated caller's identity.
     assert http(base, "/api/agent/call", {"name": "atlas_projects"}, headers)[0] == 400
+
+
+def test_copilot_context_script_is_served_and_wired_into_the_page(app):
+    base, _ = app
+    code, raw, headers = http(base, "/copilot-context.js")
+    assert code == 200 and b"atlasCopilotContext" in raw
+    assert headers["Content-Type"].startswith("text/javascript")
+    page = http(base, "/")[1].decode()
+    assert page.index("/copilot-context.js") < page.index("/app.js")

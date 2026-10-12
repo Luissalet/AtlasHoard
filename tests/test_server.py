@@ -97,3 +97,12 @@ def test_copilot_context_script_is_served_and_wired_into_the_page(app):
     assert headers["Content-Type"].startswith("text/javascript")
     page = http(base, "/")[1].decode()
     assert page.index("/copilot-context.js") < page.index("/app.js")
+
+def test_shared_assistant_launcher_is_injected_and_its_routes_are_guarded(app):
+    base, store = app
+    code, raw, headers = http(base, "/")
+    assert code == 200 and b"/api/copilot/launcher.js" in raw
+    code, raw, _ = http(base, "/api/copilot/launcher.js")
+    assert code == 200 and b"faustus-chat" in raw
+    assert http(base, "/api/copilot/info")[0] == 401
+    assert http(base, "/api/copilot/proxy", {"path": "/api/chat/x"})[0] == 401

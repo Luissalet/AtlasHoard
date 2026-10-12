@@ -24,4 +24,49 @@ async function refresh() {try{const status=await api("/api/status");projects=sta
 $("#new-project").addEventListener("click",()=>{$("#create-panel").hidden=false;$("#create-form input").focus();});$("#cancel-create").addEventListener("click",()=>{$("#create-panel").hidden=true;});
 $("#create-form").addEventListener("input",e=>{delete e.currentTarget.dataset.requestId;});
 $("#create-form").addEventListener("submit",async e=>{e.preventDefault();const form=e.currentTarget,submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const values=Object.fromEntries(new FormData(form));const members=[...new Set([values.owner.trim().toLowerCase(),...values.members.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean)])];form.dataset.requestId ||= crypto.randomUUID();const result=await call("project_create",{name:values.name,owner:values.owner.trim().toLowerCase(),members,sphere:values.sphere,goal:values.goal,request_id:form.dataset.requestId});selected=result.project.id;area="shared";$("#create-panel").hidden=true;form.reset();delete form.dataset.requestId;message("Proyecto creado. Copia la ruta de su carpeta y empieza a guardar archivos allí.");await refresh();}catch(err){message(err.message,true);}finally{submit.disabled=false;}});
+// --- Family assistant contract: real context of the open view and in-place refresh ---
+const CREATE_DEFAULTS = {name: "", owner: "faustus", members: "", sphere: "personal", goal: ""};
+function captureFileDraft() {const panel=$("#file-panel"),input=$("#relative-path");if(!panel||!input||panel.hidden)return null;return {value:input.value,focused:document.activeElement===input,start:input.selectionStart,end:input.selectionEnd};}
+function restoreFileDraft(draft) {if(!draft)return;const panel=$("#file-panel"),input=$("#relative-path");if(!panel||!input)return;panel.hidden=false;input.value=draft.value;if(draft.focused){input.focus();try{input.setSelectionRange(draft.start,draft.end);}catch(e){}}}
+async function refreshInPlace() {
+  try {
+    const status = await api("/api/status");
+    projects = status.projects; $("#disk-root").textContent = status.root; projectNavigation();
+    if (!selected) return;
+    const requestedId = selected, generation = loadGeneration;
+    const view = await call("project", {project_id: requestedId});
+    if (generation !== loadGeneration || selected !== requestedId) return;
+    if (area !== "shared" && !view.project.members.includes(area)) area = "shared";
+    const draft = captureFileDraft();
+    activeProject = view.project; render(view); restoreFileDraft(draft);
+  } catch (e) { /* keep the current view; the next turn refreshes again */ }
+}
+function createFormSnapshot() {
+  const panel = $("#create-panel"); if (!panel || panel.hidden) return null;
+  const values = Object.fromEntries(new FormData($("#create-form")));
+  return {form: "project_create", mode: "create", fields: globalThis.atlasCopilotContext.changedFields(CREATE_DEFAULTS, values)};
+}
+function fileFormSnapshot() {
+  const panel = $("#file-panel"), input = $("#relative-path"); if (!panel || !input || panel.hidden) return null;
+  return {form: "file_register", mode: "create", project_id: selected, area, fields: globalThis.atlasCopilotContext.changedFields({relative_path: ""}, {relative_path: input.value})};
+}
+async function copilotContext() {
+  const CC = globalThis.atlasCopilotContext;
+  try {
+    const editor = CC.editorContext(window);
+    let view = null;
+    if (selected) { try { view = await call("project", {project_id: selected}); } catch (e) { view = null; } }
+    const prefix = area === "shared" ? "shared/" : `hoards/${area}/`;
+    const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix)) : [];
+    return CC.buildContext({view, area, files, editor});
+  } catch (e) { return {active_objects: [], view: {page: "home"}}; }
+}
+if (typeof window !== "undefined" && globalThis.atlasCopilotContext) {
+  window.addEventListener("atlas:context-request", e => {
+    for (const snapshot of [createFormSnapshot(), fileFormSnapshot()]) if (snapshot) e.detail.provide(snapshot);
+  });
+  const scheduleRefresh = globalThis.atlasCopilotContext.debounced(refreshInPlace, 250);
+  window.addEventListener("hoard:copilot-turn-end", scheduleRefresh);
+  window.hoardCopilot = {context: copilotContext, onTurnEnd: scheduleRefresh};
+}
 refresh();

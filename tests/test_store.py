@@ -311,3 +311,25 @@ def test_missing_original_is_reported_and_never_recreated(store):
     result = store.dispatch("atlas_file_resolve", {"file_id": asset["id"]}, "writer")["file"]
     assert result["state"] == "missing" and not result["exists"]
     assert not Path(result["path"]).exists()
+
+
+def test_project_update_is_a_partial_merge_so_agent_and_manual_edits_both_survive(store):
+    p = project(store)
+    # An agent edit lands while a person still holds the old form.
+    store.dispatch("atlas_project_update", {"project_id": p["id"], "goal": "Agent goal", "members": ["writer", "lumiere", "kafka"]}, "hub")
+    # The manual save sends only the changed field.
+    result = store.dispatch("atlas_project_update", {"project_id": p["id"], "name": "Renamed by hand"}, "ui")["project"]
+    assert result["name"] == "Renamed by hand"
+    assert result["goal"] == "Agent goal"
+    assert result["members"] == ["kafka", "lumiere", "writer"]
+    assert result["state"] == "active"
+    assert result["path"] == p["path"]
+    # Archiving alone never touches the text fields.
+    archived = store.dispatch("atlas_project_update", {"project_id": p["id"], "state": "archived"}, "ui")["project"]
+    assert (archived["name"], archived["goal"], archived["state"]) == ("Renamed by hand", "Agent goal", "archived")
+    # Unknown projects and invalid values fail without changing anything.
+    with pytest.raises(StoreError):
+        store.dispatch("atlas_project_update", {"project_id": "missing", "name": "x"}, "ui")
+    with pytest.raises(StoreError):
+        store.dispatch("atlas_project_update", {"project_id": p["id"], "state": "bogus"}, "ui")
+    assert store.dispatch("atlas_project", {"project_id": p["id"]}, "ui")["project"]["name"] == "Renamed by hand"

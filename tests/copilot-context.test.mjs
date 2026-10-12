@@ -114,3 +114,25 @@ test('turn end refreshes once for both triggers and keeps the half-typed file pa
   assert.equal(app.calls.length - before, 1);
   assert.equal(app.q('#relative-path').value, 'shared/typed-by-hand.png');
 });
+
+test('context() keeps the folder it started with when the area changes while the project fetch is pending', async () => {
+  let release = null, hold = false;
+  const view = { project: { ...project, members: ['writer'] }, files: [
+    { id: 'fs', title: 's.png', relative_path: 'shared/s.png', app: 'writer', revision: 'r', state: 'available', exists: true, path: '/d/p1/shared/s.png' },
+    { id: 'fw', title: 'w.png', relative_path: 'hoards/writer/w.png', app: 'writer', revision: 'r', state: 'available', exists: true, path: '/d/p1/hoards/writer/w.png' },
+  ] };
+  const app = boot({ projects: [project], handler: () => (hold ? new Promise(r => { release = () => r(ok(view)); }) : ok(view)) });
+  await tick();
+  vm.runInContext('area = "writer"', app.context);
+  app.q('#file-panel').hidden = false;
+  app.q('#relative-path').value = 'hoards/writer/x';
+  hold = true;
+  const pending = app.window.hoardCopilot.context();
+  await tick();
+  vm.runInContext('area = "shared"', app.context);
+  release();
+  const ctx = plain(await pending);
+  assert.equal(ctx.view.area, 'writer');
+  assert.deepEqual(ctx.active_objects.map(o => o.object_id), ['p1', 'fw']);
+  assert.equal(ctx.view.editor.file_register.area, 'writer');
+});

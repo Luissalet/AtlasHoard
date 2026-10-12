@@ -132,6 +132,16 @@ El Hub añade reservas cooperativas de CPU, RAM y disco mediante
 deben adoptarla y respetar su presupuesto. No limita procesos nativos por fuerza
 ni sustituye las reservas GPU existentes.
 
+## Asistente de Faustus
+
+Con el lanzador compartido de Hoard Link instalado, la app muestra el panel de Faustus de la familia (un botón flotante). La conversación, el modelo y las herramientas viven en Faustus; esta app solo le dice al panel qué hay abierto.
+
+- **Contexto por vista.** Un proyecto abierto se envía como `project` con su id real, nombre, esfera, propietario, objetivo, estado, miembros, ruta y ruta compartida, y como proyecto externo del panel. Los archivos del área actual (`shared` o la carpeta de una app) van detrás como `file`, hasta 50: título, ruta relativa, app, revisión, estado, si existe y ruta. Solo se envían metadatos, nunca el contenido de los archivos. Sin proyecto abierto la vista es `home` y no da objeto.
+- **Campos sin guardar.** El panel los pide con el evento de ventana `atlas:context-request`. Los formularios abiertos responden con los campos que difieren de sus valores por defecto: `project_create` (proyecto nuevo) y `file_register` (ruta relativa).
+- **Refresco.** Cuando el asistente termina un turno, el proyecto abierto se recarga en el sitio (`hoard:copilot-turn-end` / `window.hoardCopilot.onTurnEnd`, unidos en una sola recarga). La ruta relativa que estás escribiendo conserva su texto, el foco y el cursor.
+- **Guardado.** `atlas_project_update` fusiona solo los campos que recibe, de modo que sobreviven tanto la edición del asistente como la manual (archivar solo toca `state`). No cambia ningún endpoint; el script de la página se sirve en `/copilot-context.js`.
+- **Pruebas.** `node --test tests/copilot-context.test.mjs` y `python -m pytest tests/test_copilot_ui.py tests/test_server.py tests/test_store.py`.
+
 ## Verificación
 
 Las pruebas usan carpetas aisladas y datos sintéticos. Cubren rutas compartidas,

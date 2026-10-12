@@ -25,7 +25,7 @@
 
   // One trailing call per burst, so the event and onTurnEnd trigger one refresh.
   function debounced(run, wait, timers) {
-    const t = timers || { set: setTimeout, clear: clearTimeout };
+    const t = timers || { set: (fn, ms) => setTimeout(fn, ms), clear: (h) => clearTimeout(h) };
     let handle = null;
     return function schedule() {
       if (handle !== null) t.clear(handle);

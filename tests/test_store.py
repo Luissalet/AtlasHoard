@@ -87,6 +87,38 @@ def test_register_never_rewrites_or_copies_existing_file(store):
     assert Path(file["path"]).read_bytes() == b"native format"
 
 
+def test_search_finds_accented_titles_across_folders_with_current_presence_and_pagination(store):
+    p = project(store)
+    first = register(store, p, "shared/Informe energía.txt")
+    second = register(store, p, "hoards/lumiere/informe-energia.txt", caller="lumiere")
+    Path(first["path"]).unlink()
+    before = store.db.execute("SELECT revision, state, updated FROM files ORDER BY id").fetchall()
+    found = store.dispatch("atlas_files_search", {"project_id": p["id"], "query": "INFORME energia", "limit": 1}, "writer")
+    assert found["total"] == 2 and len(found["files"]) == 1 and found["has_more"]
+    next_page = store.dispatch("atlas_files_search", {"project_id": p["id"], "query": "informe energia", "limit": 1, "offset": 1}, "writer")
+    assert next_page["files"][0]["id"] != found["files"][0]["id"] and not next_page["has_more"]
+    missing = store.dispatch("atlas_files_search", {"project_id": p["id"], "availability": "missing"}, "writer")
+    assert [f["id"] for f in missing["files"]] == [first["id"]]
+    native = store.dispatch("atlas_files_search", {"project_id": p["id"], "area": "lumiere", "availability": "present"}, "writer")
+    assert [f["id"] for f in native["files"]] == [second["id"]]
+    assert store.db.execute("SELECT revision, state, updated FROM files ORDER BY id").fetchall() == before
+    assert Path(second["path"]).read_bytes() == b"original"
+    with pytest.raises(StoreError, match="not a member"):
+        store.dispatch("atlas_files_search", {"project_id": p["id"]}, "people")
+
+
+def test_search_includes_external_references_by_title_or_source_path_without_copying(store, tmp_path):
+    p = project(store)
+    source = tmp_path / "external-report.txt"
+    source.write_text("original source", encoding="utf-8")
+    linked = store.dispatch("atlas_file_link_source", {"project_id": p["id"], "source_path": str(source), "title": "Referencia externa"})["file"]
+    found = store.dispatch("atlas_files_search", {"project_id": p["id"], "query": "external-report"}, "writer")
+    assert found["total"] == 1 and found["files"][0]["id"] == linked["id"]
+    assert found["files"][0]["input_readonly"]
+    assert store.dispatch("atlas_files_search", {"project_id": p["id"], "area": "shared"}, "writer")["total"] == 0
+    assert source.read_text(encoding="utf-8") == "original source"
+
+
 def test_idempotency_survives_restart_and_conflicting_arguments_are_refused(tmp_path):
     data, disk = tmp_path / "private", tmp_path / "disk"
     first = Workspace(data, disk)

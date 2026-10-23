@@ -14,6 +14,16 @@ derived results. Cache reuse requires exact source/output hashes and recipes.
 Lumiere's `media_shared` opens live files without copying them and refreshes
 changed originals while preserving timeline references.
 
+**Find registered files:** each project has a title/path search that ignores case
+and accents, with shared/native folder and current file-presence filters. Search
+results keep the original paths and include external read-only references in the
+whole-project view. Use `atlas_files_search` through MCP or the normal
+`POST /api/agent/call` API with `project_id`, optional `query`, `area` (`all`,
+`shared` or a member application ID), `availability` (`all`, `present`, `missing`),
+`limit` (1–200) and `offset`. All query words must match the title or path. Results
+include the total and pagination. This searches registered metadata, not file
+contents or unregistered folders, and checks existence without refreshing hashes.
+
 Register project files normally with `atlas_file_register`. For a file that
 must stay in another folder, the operator can use `atlas_file_link_source` to
 add an explicit read-only reference; Atlas records its absolute path, size and

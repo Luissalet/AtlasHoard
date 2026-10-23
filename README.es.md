@@ -1,5 +1,18 @@
 # Atlas's Hoard
 
+Cada proyecto permite **buscar archivos registrados por nombre o ruta**, sin
+distinguir mayúsculas ni acentos. Se puede buscar en todo el proyecto o en una
+carpeta y mostrar todos, los que siguen en su ruta o los que no se encuentran en
+disco. Las referencias externas aparecen al buscar en todo el proyecto y mantienen
+su acceso de solo lectura; las rutas se pueden copiar. No se busca dentro del
+contenido ni se exploran carpetas sin registrar.
+
+La herramienta MCP `atlas_files_search` y `POST /api/agent/call` ofrecen lo mismo:
+`project_id`, `query` opcional, `area` (`all`, `shared` o id de aplicación miembro),
+`availability` (`all`, `present`, `missing`), `limit` (1–200) y `offset`. Todas las
+palabras deben aparecer en el título o la ruta. Devuelve total y páginas; comprueba
+la existencia actual sin recalcular hashes ni cambiar revisiones.
+
 El disco compartido de los Hoards. Archivos normales, en carpetas normales:
 Paint, Gimp y los Hoards abren el mismo PNG desde la misma ruta.
 Funciona localmente, sin servicio en la nube ni dependencias de ejecución externas.

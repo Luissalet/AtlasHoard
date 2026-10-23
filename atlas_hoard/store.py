@@ -285,6 +285,37 @@ class Workspace:
         files = self.db.execute("SELECT * FROM files WHERE project_id=? ORDER BY relative_path LIMIT 2000", (project["id"],)).fetchall()
         return {"ok": True, "project": self._project_view(project), "files": [self._file_view(f, project) for f in files]}
 
+    def file_search(self, args, caller):
+        project = self._project(args.get("project_id"), caller)
+        query = text(args.get("query", ""), "query", 200)
+        area = args.get("area", "all")
+        if area not in ("all", "shared") and area not in json.loads(project["members"]):
+            raise StoreError("area must be all, shared or a project member")
+        availability = args.get("availability", "all")
+        if availability not in ("all", "present", "missing"):
+            raise StoreError("availability must be all, present or missing")
+        limit, offset = args.get("limit", 100), args.get("offset", 0)
+        if type(limit) is not int or not 1 <= limit <= 200 or type(offset) is not int or offset < 0:
+            raise StoreError("limit must be 1..200 and offset a nonnegative integer")
+        def normalize(value):
+            return "".join(c for c in unicodedata.normalize("NFKD", value.casefold()) if not unicodedata.combining(c))
+        terms = normalize(query).split()
+        prefix = "shared/" if area == "shared" else f"hoards/{area}/"
+        matches = []
+        for row in self.db.execute("SELECT * FROM files WHERE project_id=? ORDER BY relative_path", (project["id"],)):
+            if area != "all" and not row["relative_path"].startswith(prefix):
+                continue
+            haystack = normalize(row["title"] + " " + row["relative_path"] + " " + (row["external_path"] or ""))
+            if not all(term in haystack for term in terms):
+                continue
+            file = self._file_view(row, project)
+            if availability == "present" and not file["exists"] or availability == "missing" and file["exists"]:
+                continue
+            matches.append(file)
+        return {"ok": True, "project_id": project["id"], "query": query, "area": area,
+                "availability": availability, "total": len(matches), "limit": limit, "offset": offset,
+                "files": matches[offset:offset + limit], "has_more": offset + limit < len(matches)}
+
     def location(self, args, caller):
         project = self._project(args.get("project_id"), caller)
         area = args.get("area", "shared")
@@ -486,7 +517,7 @@ class Workspace:
             raise StoreError("arguments must be an object")
         handlers = {"atlas_project_create": self.project_create, "atlas_project_update": self.project_update,
                     "atlas_projects": self.project_list, "atlas_project": self.project_get,
-                    "atlas_location": self.location, "atlas_file_register": self.file_register,
+                    "atlas_location": self.location, "atlas_file_register": self.file_register, "atlas_files_search": self.file_search,
                     "atlas_file_resolve": self.file_resolve, "atlas_file_import": self.file_import,
                     "atlas_file_link_source": self.file_link_source,
                     "atlas_derived_publish": self.derived_publish, "atlas_derived_lookup": self.derived_lookup,

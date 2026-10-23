@@ -3,3 +3,13 @@
 @media(prefers-reduced-motion:no-preference){button{transition:background-color .12s ease-out,border-color .12s ease-out}}
 
 .app-brand{display:flex;align-items:center;gap:14px;min-width:0}.app-brand img{flex-shrink:0;object-fit:contain}@media(max-width:480px){.app-brand{gap:9px}.app-brand img{width:36px;height:36px}}
+
+.file-search{padding-bottom:24px;margin-bottom:24px;border-bottom:1px solid var(--hoard-border)}
+.file-search>p{margin-top:6px;font-size:12px;max-width:72ch}
+.search-form{grid-template-columns:minmax(180px,2fr) minmax(120px,1fr) minmax(150px,1fr) auto auto;gap:12px;align-items:end;margin-top:16px}
+.search-form button{white-space:nowrap}
+.search-results[aria-busy=true]{opacity:.65}
+.search-count{margin-top:20px;margin-bottom:8px;font-size:15px;color:var(--hoard-text-muted)}
+.search-pages{display:flex;gap:10px;margin-top:12px}
+@media(max-width:1100px){.search-form{grid-template-columns:repeat(2,minmax(0,1fr))}.search-form>label:first-child{grid-column:1/-1}}
+@media(max-width:520px){.search-form{grid-template-columns:1fr 1fr}.search-form>label{grid-column:1/-1}.search-results table{min-width:300px}}

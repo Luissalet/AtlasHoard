@@ -2,6 +2,7 @@
 const $ = (s) => document.querySelector(s);
 let projects = [], selected = null, area = "shared", activeProject = null, loadGeneration = 0;
 let projectTab = "files";
+let projectFilters = {query:"",state:"",sphere:""}, projectFilterGeneration = 0, projectFilterTimer;
 let projectEditorOpen = false, projectEditorElement = null;
 const projectDrafts = new Map();
 let searchState = {query: "", area: "all", availability: "all", result: null}, searchGeneration = 0;
@@ -65,7 +66,36 @@ function projectEditorPanel(project) {
   });
   return panel;
 }
-function projectNavigation() {const nav=$("#projects");nav.replaceChildren();for(const p of projects){const b=button(p.name,()=>choose(p.id));b.setAttribute("aria-current",String(p.id===selected));b.append(node("small",(p.sphere==="work"?"Trabajo":p.sphere==="freelance"?"Autónomo":"Personal")+(p.state==="archived"?" · Archivado":"")));nav.append(b);}if(!projects.length)nav.append(node("p","Todavía no hay proyectos.","muted"));}
+function drawProjectNavigation(visible) {
+  const nav=$("#projects");nav.replaceChildren();
+  for(const p of visible){const b=button(p.name,()=>choose(p.id));b.setAttribute("aria-current",String(p.id===selected));b.append(node("small",(p.sphere==="work"?"Trabajo":p.sphere==="freelance"?"Autónomo":"Personal")+(p.state==="archived"?" · Archivado":"")));nav.append(b);}
+  if(!visible.length)nav.append(node("p",projects.length?"No hay proyectos con estos filtros.":"Todavía no hay proyectos.","muted"));
+  $("#project-filter-status").textContent=`${visible.length} de ${projects.length} proyectos`;
+  const outside=selected&&!visible.some(p=>p.id===selected),note=$("#project-filter-selection");
+  note.hidden=!outside;note.textContent=outside?`Abierto fuera del filtro: ${activeProject?.name||projects.find(p=>p.id===selected)?.name||"proyecto actual"}.`:"";
+}
+async function projectNavigation() {
+  const generation=++projectFilterGeneration,filters={...projectFilters},nav=$("#projects");
+  const filtered=Object.values(filters).some(Boolean);
+  nav.setAttribute("aria-busy","true");$("#project-filter-submit").textContent="Filtrar";
+  if(filtered)$("#project-filter-status").textContent="Actualizando proyectos…";
+  try {
+    const visible=filtered?(await call("projects",filters)).projects:projects;
+    if(generation!==projectFilterGeneration)return;
+    drawProjectNavigation(visible);
+  }catch(error){if(generation===projectFilterGeneration){$("#project-filter-status").textContent="No se pudo filtrar. Se conserva la lista anterior; reintenta la consulta.";$("#project-filter-submit").textContent="Reintentar";}}
+  finally{if(generation===projectFilterGeneration)nav.removeAttribute("aria-busy");}
+}
+function updateProjectFilters(delayed=false) {
+  projectFilters={query:$("#project-query").value,state:$("#project-state").value,sphere:$("#project-sphere").value};
+  ++projectFilterGeneration;clearTimeout(projectFilterTimer);
+  if(delayed){$("#projects").setAttribute("aria-busy","true");$("#project-filter-status").textContent="Actualizando proyectos…";projectFilterTimer=setTimeout(projectNavigation,250);}
+  else projectNavigation();
+}
+$("#project-query").addEventListener("input",()=>updateProjectFilters(true));
+for(const selector of ["#project-state","#project-sphere"])$(selector).addEventListener("change",()=>updateProjectFilters());
+$("#project-filter-form").addEventListener("submit",event=>{event.preventDefault();updateProjectFilters();});
+$("#project-filter-reset").addEventListener("click",()=>{$("#project-query").value="";$("#project-state").value="";$("#project-sphere").value="";updateProjectFilters();});
 async function choose(id) {selected=id;area="shared";projectTab="files";projectEditorOpen=false;searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
 async function showProject() {if(!selected)return;const requestedId=selected,generation=++loadGeneration;activeProject=null;const loading=node("section",undefined,"empty");loading.append(node("h2","Cargando archivos del proyecto…"));$("#main").replaceChildren(loading);$("#main").setAttribute("aria-busy","true");try{const view=await call("project",{project_id:requestedId});if(generation!==loadGeneration||selected!==requestedId)return;activeProject=view.project;render(view);}catch(e){if(generation===loadGeneration&&selected===requestedId){loading.replaceChildren(node("p","No se pudo abrir el proyecto. Selecciónalo de nuevo para reintentar."));message(e.message,true);}}finally{if(generation===loadGeneration)$("#main").removeAttribute("aria-busy");}}
 function icon() {const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 28");svg.setAttribute("aria-hidden","true");const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("d","M5 2h9l5 5v19H5z M14 2v6h5 M8 13h8 M8 17h8 M8 21h5");svg.append(path);return svg;}
@@ -174,6 +204,7 @@ async function copilotContext() {
   try {
     // Everything mutable is captured before the first await: navigating while the fetch is pending must not mix two views.
     const openId = selected, openArea = area, openTab = projectTab;
+    const openProjectFilters = {...projectFilters};
     const openSearch = searchState.result && {query:searchState.result.query,area:searchState.result.area,availability:searchState.result.availability,total:searchState.result.total};
     const editor = CC.editorContext(window);
     let view = null;
@@ -182,6 +213,7 @@ async function copilotContext() {
     const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix) || (openTab === "files" && f.external)) : [];
     const context = CC.buildContext({view, area: openArea, files, editor});
     context.view.project_tab = openTab;
+    context.view.project_filters = openProjectFilters;
     if (openSearch && openTab === "files") context.view.search = openSearch;
     return context;
   } catch (e) { return {active_objects: [], view: {page: "home"}}; }

@@ -24,6 +24,17 @@ whole-project view. Use `atlas_files_search` through MCP or the normal
 include the total and pagination. This searches registered metadata, not file
 contents or unregistered folders, and checks existence without refreshing hashes.
 
+**Find projects:** the projects sidebar filters names and goals by all query words,
+ignoring case and accents, alongside state (active/archived) and sphere. It shows
+the matching count, a clear action and an explicit notice when the open project
+is outside the filter. Filtering keeps the project and its unsaved forms open;
+refreshes retain the filters, and obsolete responses cannot replace newer results.
+Errors keep the preceding list and identify it as such, with Retry. The existing
+`atlas_projects` HTTP/MCP operation accepts optional `query`, `state` and `sphere`;
+its `projects` response remains compatible with unfiltered callers. It reads all
+accessible project metadata, including projects older than the former global1000
+row cutoff, without reading file contents, checking hashes or changing any paths.
+
 Register project files normally with `atlas_file_register`. For a file that
 must stay in another folder, the operator can use `atlas_file_link_source` to
 add an explicit read-only reference; Atlas records its absolute path, size and

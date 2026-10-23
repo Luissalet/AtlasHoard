@@ -34,6 +34,20 @@ remains the explicit one-time copy operation. Existing applications' native
 databases and copying importers remain unchanged.
 See [external source references](docs/EXTERNAL-SOURCES.md) for the MCP contract
 and its filesystem limits.
+
+**Reusable results:** open a project's **Resultados reutilizables** view to see
+saved outputs, source revisions and the full recipe. **Comprobar ahora** calls
+`atlas_derived_lookup` against current file hashes; a list entry alone never
+claims freshness. Register an already generated, registered output with its
+sources, operation/version and optional model revision/JSON options. Publishing
+declares that the output was produced from those current source revisions; Atlas
+does not run the operation. Regenerate externally first if the sources changed.
+`atlas_derived_results` takes `project_id` through HTTP/MCP and returns `results`
+with the saved recipe, source/output revisions, file metadata and recorded state;
+`freshness: "unchecked"` means it has not refreshed hashes. Form drafts survive
+view switches and in-place refreshes and are exposed to the assistant as unsaved
+fields, alongside the active project tab.
+
 Membership restricts the API, not OS filesystem access. No automatic migration,
 continuous watcher or cloud dependency. BookHoard and WatchHoard are independent.
 

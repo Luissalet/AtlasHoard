@@ -30,6 +30,8 @@ def catalogue():
          {**PROJECT, "source_path": field(description="Absolute path to an existing source file outside the project."), "app": field(), "title": field(), **RECEIPT}, ["project_id", "source_path"], False),
         ("atlas_file_import", "Operator-only: copy one explicit external file into shared storage once. Never moves the source or overwrites an existing destination.",
          {**PROJECT, "source_path": field(), "name": field(), **RECEIPT}, ["project_id", "source_path"], False),
+        ("atlas_derived_results", "List saved result files, recipes and original source/output revisions for a project. Read-only metadata; freshness is unchecked until derived_lookup verifies current hashes.",
+         PROJECT, ["project_id"], True),
         ("atlas_derived_publish", "Register a reusable result file with exact source revisions and processing recipe. Does not perform OCR, transcription or model inference.",
          {**PROJECT, **RECIPE, "source_revisions": field("object"), "output_id": field(), **RECEIPT}, ["project_id", "source_ids", "recipe", "source_revisions", "output_id"], False),
         ("atlas_derived_lookup", "Check a reusable result against current source and output hashes, recipe and project access. Changes or missing files produce a cache miss.",

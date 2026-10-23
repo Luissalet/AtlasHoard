@@ -311,17 +311,30 @@ def test_derived_cache_reuses_exact_recipe_and_invalidates_source_output_or_memb
     assert not miss["hit"]
     expected = {s["id"]: s["revision"] for s in miss["sources"]}
     store.dispatch("atlas_derived_publish", {**args, "source_revisions": expected, "output_id": output["id"]}, "writer")
+    changes = store.db.total_changes
+    saved = store.dispatch("atlas_derived_results", {"project_id": p["id"]}, "lumiere")
+    assert saved["freshness"] == "unchecked" and store.db.total_changes == changes
+    row = saved["results"][0]
+    assert row["recipe"] == args["recipe"] and row["output_revision"] == output["revision"]
+    assert row["source_revisions"] == [{"id": source["id"], "revision": source["revision"]}]
+    assert row["sources"][0]["path"] == source["path"] and row["output"]["path"] == output["path"]
     hit = store.dispatch("atlas_derived_lookup", args, "lumiere")
     assert hit["hit"] and hit["file"]["path"] == output["path"]
     assert not store.dispatch("atlas_derived_lookup", {**args, "recipe": {**args["recipe"], "model": "fixture-v2"}}, "lumiere")["hit"]
     Path(output["path"]).write_bytes(b"human edit")
     assert not store.dispatch("atlas_derived_lookup", args, "lumiere")["hit"]
     Path(source["path"]).write_bytes(b"new source")
+    changes = store.db.total_changes
+    listed = store.dispatch("atlas_derived_results", {"project_id": p["id"]}, "writer")["results"][0]
+    assert listed["source_revisions"] == row["source_revisions"] and listed["recorded_state"] == "stale"
+    assert store.db.total_changes == changes
     with pytest.raises(StoreError, match="sources changed"):
         store.dispatch("atlas_derived_publish", {**args, "source_revisions": expected, "output_id": output["id"]}, "writer")
     store.dispatch("atlas_project_update", {"project_id": p["id"], "members": ["writer"]})
     with pytest.raises(StoreError, match="not a member"):
         store.dispatch("atlas_derived_lookup", args, "lumiere")
+    with pytest.raises(StoreError, match="not a member"):
+        store.dispatch("atlas_derived_results", {"project_id": p["id"]}, "lumiere")
 
 
 def test_context_is_bounded_scoped_and_marks_sources_untrusted(store):

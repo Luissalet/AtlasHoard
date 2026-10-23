@@ -1,5 +1,21 @@
 # Atlas's Hoard
 
+En **Resultados reutilizables**, cada proyecto muestra sus salidas registradas,
+la receta completa y las revisiones de los archivos de origen. **Comprobar ahora**
+verifica los hashes actuales: el listado comienza como pendiente de comprobar.
+Puedes **Registrar resultado** eligiendo una salida ya guardada y registrada,
+sus orígenes y la operación/versión; modelo y opciones JSON son opcionales.
+Declaras que la salida se obtuvo con las versiones actuales de esos orígenes.
+Si cambiaron desde que la generaste, vuelve a generarla antes de registrarla.
+Atlas registra la relación y no ejecuta la transformación. Los borradores se
+conservan al cambiar de vista y al refrescar tras un turno del asistente.
+
+La nueva herramienta MCP/HTTP `atlas_derived_results` recibe `project_id` y
+devuelve `results` con receta, revisiones guardadas y metadatos de origen/salida.
+Es de solo lectura, sin recalcular hashes: `freshness: "unchecked"` no significa
+vigente. `atlas_derived_lookup` hace la comprobación actual y
+`atlas_derived_publish` registra la relación con las revisiones explícitas.
+
 Cada proyecto permite **buscar archivos registrados por nombre o ruta**, sin
 distinguir mayúsculas ni acentos. Se puede buscar en todo el proyecto o en una
 carpeta y mostrar todos, los que siguen en su ruta o los que no se encuentran en

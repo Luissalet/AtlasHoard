@@ -11,7 +11,7 @@ const node = (tag, text, cls) => {const e=document.createElement(tag); if(text!=
 function message(text, error=false) {const el=$("#message");el.textContent=text;el.dataset.error=String(error);el.hidden=!text;}
 async function api(path, body) {const res=await fetch(path,{method:body?"POST":"GET",credentials:"same-origin",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined});const result=await res.json();if(!res.ok||result.ok===false)throw new Error(result.error||"Atlas no pudo completar la operación. Prueba de nuevo.");return result.result||result;}
 const call=(name,arguments_)=>api("/api/agent/call",{name:`atlas_${name}`,arguments:arguments_});
-async function copy(value) {try{await navigator.clipboard.writeText(value);message("Ruta copiada. Puedes usarla en cualquier aplicación del proyecto.");}catch(e){message("No se pudo copiar. Selecciona la ruta y cópiala con Ctrl+C.",true);}}
+async function copy(value) {try{await navigator.clipboard.writeText(value);message("Ruta copiada. Puedes usarla en cualquier aplicación del proyecto.");return true;}catch(e){message("No se pudo copiar. Selecciona la ruta y cópiala con Ctrl+C.",true);return false;}}
 function button(text, action, cls) {const b=node("button",text,cls);b.type="button";b.addEventListener("click",action);return b;}
 function captureProjectEditorFocus() {
   const field=document.activeElement;
@@ -132,6 +132,7 @@ const folder=area==="shared"?p.shared_path:p.hoard_paths[area];const location=no
 const bar=node("div",undefined,"file-header");bar.append(node("h3",area==="shared"?"Archivos compartidos":`Archivos de ${appName(area)}`),button("Registrar archivo",()=>{$("#file-panel").hidden=!$("#file-panel").hidden;if(!$("#file-panel").hidden)$("#relative-path").focus();}));main.append(bar);
 const filePanel=node("section",undefined,"file-form");filePanel.id="file-panel";filePanel.hidden=true;const form=node("form");const label=node("label","Archivo guardado dentro del proyecto");const input=node("input");input.id="relative-path";input.name="relative_path";input.required=true;input.placeholder=area==="shared"?"shared/portada.png":`hoards/${area}/proyecto`;label.append(input,node("small","Registra el archivo para compartir su ruta. Su contenido no se modifica."));const actions=node("div",undefined,"form-actions");const submit=node("button","Registrar");submit.type="submit";actions.append(submit,button("Cancelar",()=>{filePanel.hidden=true;},"quiet"));form.append(label,actions);form.addEventListener("submit",async e=>{e.preventDefault();submit.disabled=true;try{let relative=input.value.trim().replaceAll("\\","/");const base=p.path.replaceAll("\\","/")+"/";if(relative.toLowerCase().startsWith(base.toLowerCase()))relative=relative.slice(base.length);await call("file_register",{project_id:p.id,relative_path:relative,app:area==="shared"?p.owner:area});message("Archivo registrado. Los Hoards del proyecto usarán esta misma ruta.");await showProject();}catch(err){message(err.message,true);}finally{submit.disabled=false;}});filePanel.append(form);main.append(filePanel);
 const prefix=area==="shared"?"shared/":`hoards/${area}/`;const files=view.files.filter(f=>(f.relative_path || "").startsWith(prefix));if(files.length){const wrap=node("div",undefined,"table-wrap"),table=node("table"),head=node("thead"),hr=node("tr");for(const h of ["Archivo","Registrado por","Acceso"])hr.append(node("th",h));head.append(hr);table.append(head);const body=node("tbody");for(const f of files){const row=node("tr"),name=node("td"),line=node("div",undefined,"file-name");const details=node("div");details.append(node("strong",f.title),node("p",f.relative_path));if(!f.exists)details.append(node("p","El archivo no está en su ruta. Comprueba si lo has movido.","state"));line.append(icon(),details);name.append(line);const app=node("td",appName(f.app),"muted"),access=node("td");access.append(button("Copiar ruta",()=>copy(f.path)));row.append(name,app,access);body.append(row);}table.append(body);wrap.append(table);main.append(wrap);}else{const empty=node("section",undefined,"folder-empty");empty.append(node("h3","Esta carpeta está lista para usar"),node("p","Guarda aquí un PNG, un documento o el proyecto nativo de tu aplicación. Después regístralo para que los demás Hoards puedan encontrarlo."));main.append(empty);}
+main.append(globalThis.atlasExternalReferences.create({view,call,copy,refresh:refreshInPlace}));
 const members=node("section",undefined,"members");members.append(node("h3","Trabajan en este proyecto"),node("p",p.members.map(appName).join(" · ")),node("p","Los archivos compartidos son originales de trabajo. Si los editas en otra aplicación, el cambio se ve en la misma ruta."));main.append(members);}
 async function refresh() {try{const status=await api("/api/status");projects=status.projects;$("#disk-root").textContent=status.root;projectNavigation();if(projects.length&&!selected)selected=projects[0].id;if(selected){projectNavigation();await showProject();}}catch(e){message("No se pudo leer el disco compartido. "+e.message,true);}}
 $("#new-project").addEventListener("click",()=>{$("#create-panel").hidden=false;$("#create-form input").focus();});$("#cancel-create").addEventListener("click",()=>{$("#create-panel").hidden=true;});
@@ -178,7 +179,7 @@ async function copilotContext() {
     let view = null;
     if (openId) { try { view = await call("project", {project_id: openId}); } catch (e) { view = null; } }
     const prefix = openArea === "shared" ? "shared/" : `hoards/${openArea}/`;
-    const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix)) : [];
+    const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix) || (openTab === "files" && f.external)) : [];
     const context = CC.buildContext({view, area: openArea, files, editor});
     context.view.project_tab = openTab;
     if (openSearch && openTab === "files") context.view.search = openSearch;
@@ -187,7 +188,7 @@ async function copilotContext() {
 }
 if (typeof window !== "undefined" && globalThis.atlasCopilotContext) {
   window.addEventListener("atlas:context-request", e => {
-    for (const snapshot of [createFormSnapshot(), fileFormSnapshot(), projectFormSnapshot()]) if (snapshot) e.detail.provide(snapshot);
+    for (const snapshot of [createFormSnapshot(), fileFormSnapshot(), projectFormSnapshot(), globalThis.atlasExternalReferences.snapshot()]) if (snapshot) e.detail.provide(snapshot);
   });
   const scheduleRefresh = globalThis.atlasCopilotContext.debounced(refreshInPlace, 250);
   window.addEventListener("hoard:copilot-turn-end", scheduleRefresh);

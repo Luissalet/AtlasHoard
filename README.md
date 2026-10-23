@@ -32,6 +32,16 @@ revision after edits, and project context marks the reference as read-only.
 Linked sources cannot be published as derived outputs. `atlas_file_import`
 remains the explicit one-time copy operation. Existing applications' native
 databases and copying importers remain unchanged.
+In **Archivos**, **Añadir referencia externa** takes an explicit absolute source
+path, optional title and project member. The project-wide references section
+shows original paths, read-only status, current presence and recorded revisions,
+independently of the selected shared/native folder. **Comprobar** uses the native
+resolver to refresh hashes and metadata; **Copiar ruta original** copies the path.
+Registration and checks read source bytes for hashing, but never execute, display,
+copy or modify the original. The form retains drafts across view changes, errors
+and copilot refresh; the existing derived-results view can use references as
+inputs, while excluding them as outputs. Duplicate handling follows the native
+tool response; this UI adds no policy or backend operation.
 See [external source references](docs/EXTERNAL-SOURCES.md) for the MCP contract
 and its filesystem limits.
 

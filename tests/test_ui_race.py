@@ -29,6 +29,7 @@ const context=vm.createContext({document,fetch:(path,options)=>{
   const body=JSON.parse(options.body);
   return new Promise(resolve=>pending.set(body.arguments.project_id,resolve));
 }});
+vm.runInContext(fs.readFileSync('atlas_hoard/ui/external-references.js','utf8'),context);
 vm.runInContext(fs.readFileSync('atlas_hoard/ui/app.js','utf8'),context);
 function answer(id,name){pending.get(id)({ok:true,json:async()=>({ok:true,result:{
   project:{id,name,members:['writer'],owner:'writer',path:'/ssd/'+id,shared_path:'/ssd/'+id+'/shared',hoard_paths:{writer:'/ssd/'+id+'/hoards/writer'}},files:[]}})});}

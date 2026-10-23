@@ -75,6 +75,7 @@
         out.active_objects.push({
           kind: "file", object_id: f.id, title: f.title, relative_path: f.relative_path,
           app: f.app, revision: f.revision, state: f.state, exists: f.exists, path: f.path,
+          ...(f.external ? {external:true, input_readonly:true, source_path:f.source_path} : {}),
         });
       }
       out.view = { page: "project", object_id: p.id, area: area || "shared" };

@@ -1,5 +1,19 @@
 # Atlas's Hoard
 
+En **Archivos**, **Añadir referencia externa** registra una ruta absoluta de un
+archivo que permanece fuera de la carpeta del proyecto, con título opcional y
+Hoard participante. **Referencias externas del proyecto** muestra siempre esas
+entradas, independientemente de Compartidos o la carpeta de un Hoard: ruta real,
+solo lectura, disponibilidad, tamaño y revisión registrados. **Comprobar** usa
+el resolver nativo para actualizar hash/metadatos; **Copiar ruta original** copia
+su ruta. Ambas operaciones de registro/comprobación leen bytes para calcular el
+hash, sin copiar, modificar, ejecutar ni abrir un visualizador del original.
+Los borradores sobreviven a cambios de vista, errores y refrescos del asistente,
+y las referencias visibles forman parte del contexto de sólo lectura. En
+Resultados se pueden usar como origen y permanecen excluidas como salida. Los
+duplicados siguen la respuesta nativa existente, sin políticas nuevas. No cambia
+API/MCP14, backend, permisos ni dependencias.
+
 **Editar proyecto**, junto al título, permite cambiar nombre, objetivo opcional,
 otros Hoards participantes y estado en curso/archivado. Usa `atlas_project_update`
 existente y envía sólo los campos cambiados; vaciar el objetivo lo borra. Al abrir

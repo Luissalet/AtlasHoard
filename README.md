@@ -51,6 +51,18 @@ fields, alongside the active project tab.
 Membership restricts the API, not OS filesystem access. No automatic migration,
 continuous watcher or cloud dependency. BookHoard and WatchHoard are independent.
 
+**Edit a project:** **Editar proyecto** opens the current name, optional goal,
+other participating Hoard IDs and active/archived state. Only fields actually
+changed are sent to the existing `atlas_project_update`; an empty goal clears it.
+Opening again or an assistant refresh reads current data while preserving the
+unsaved fields, focus and cursor. Closing the editor keeps its draft; **Descartar
+cambios** discards it. Draft fields are included in the existing assistant context.
+Renaming does not move its folder; owner, sphere, file IDs/paths/revisions stay
+stable. The owner remains a member. Removing another Hoard keeps its folders and
+files, and an open removed folder falls back to Compartidos after save. Archived
+projects stay listed with a label and can be reactivated from the same editor.
+This UI adds no new backend operation or permission model.
+
 See [the Spanish operating guide](README.es.md) for examples, backup behavior,
 resource coordination and practical limits. Vendored HoardLink keeps its license
 and attribution. This application is MIT licensed.

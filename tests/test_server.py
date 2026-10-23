@@ -43,7 +43,7 @@ def test_health_is_public_catalogue_and_calls_are_authenticated(app):
     assert http(base, "/api/agent/call", {"name": "atlas_projects"})[0] == 401
     code, body, _ = http(base, "/api/agent/tools", headers={"Authorization": "Bearer operator-token"})
     tools = json.loads(body)["tools"]
-    assert code == 200 and len(tools) == 12
+    assert code == 200 and len(tools) == 13
     linked = next(tool for tool in tools if tool["name"] == "atlas_file_link_source")
     assert linked["inputSchema"]["required"] == ["project_id", "source_path"]
 

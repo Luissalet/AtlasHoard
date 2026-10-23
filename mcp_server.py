@@ -10,6 +10,9 @@ from atlas_hoard.hoard_link._hubclient import fetch_detailed
 
 
 def main():
+    # MCP JSON-RPC is UTF-8, including on Windows consoles using a legacy code page.
+    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
     base = os.environ.get("ATLAS_URL", "http://127.0.0.1:5203").rstrip("/")
     parsed = urlsplit(base)
     if parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost") or parsed.username or parsed.password:

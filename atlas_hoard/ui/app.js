@@ -5,6 +5,7 @@ let projectTab = "files";
 let projectFilters = {query:"",state:"",sphere:""}, projectFilterGeneration = 0, projectFilterTimer;
 let projectEditorOpen = false, projectEditorElement = null;
 const projectDrafts = new Map();
+const referenceDrafts = new Map();
 let searchState = {query: "", area: "all", availability: "all", result: null}, searchGeneration = 0;
 const labels = {faustus:"Faustus",writer:"Writer",lumiere:"Lumiere",prospero:"Prospero",borges:"Borges",kafka:"Kafka",daguerre:"Daguerre",scheherazade:"Scheherazade"};
 const appName = (id) => labels[id] || id;
@@ -96,9 +97,84 @@ $("#project-query").addEventListener("input",()=>updateProjectFilters(true));
 for(const selector of ["#project-state","#project-sphere"])$(selector).addEventListener("change",()=>updateProjectFilters());
 $("#project-filter-form").addEventListener("submit",event=>{event.preventDefault();updateProjectFilters();});
 $("#project-filter-reset").addEventListener("click",()=>{$("#project-query").value="";$("#project-state").value="";$("#project-sphere").value="";updateProjectFilters();});
-async function choose(id) {selected=id;area="shared";projectTab="files";projectEditorOpen=false;searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
-async function showProject() {if(!selected)return;const requestedId=selected,generation=++loadGeneration;activeProject=null;const loading=node("section",undefined,"empty");loading.append(node("h2","Cargando archivos del proyecto…"));$("#main").replaceChildren(loading);$("#main").setAttribute("aria-busy","true");try{const view=await call("project",{project_id:requestedId});if(generation!==loadGeneration||selected!==requestedId)return;activeProject=view.project;render(view);}catch(e){if(generation===loadGeneration&&selected===requestedId){loading.replaceChildren(node("p","No se pudo abrir el proyecto. Selecciónalo de nuevo para reintentar."));message(e.message,true);}}finally{if(generation===loadGeneration)$("#main").removeAttribute("aria-busy");}}
+async function choose(id) {invalidateReferences();selected=id;area="shared";projectTab="files";projectEditorOpen=false;searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
+async function showProject() {invalidateReferences();if(!selected)return;const requestedId=selected,generation=++loadGeneration;activeProject=null;const loading=node("section",undefined,"empty");loading.append(node("h2","Cargando archivos del proyecto…"));$("#main").replaceChildren(loading);$("#main").setAttribute("aria-busy","true");try{const view=await call("project",{project_id:requestedId});if(generation!==loadGeneration||selected!==requestedId)return;activeProject=view.project;render(view);}catch(e){if(generation===loadGeneration&&selected===requestedId){loading.replaceChildren(node("p","No se pudo abrir el proyecto. Selecciónalo de nuevo para reintentar."));message(e.message,true);}}finally{if(generation===loadGeneration)$("#main").removeAttribute("aria-busy");}}
 function icon() {const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 28");svg.setAttribute("aria-hidden","true");const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("d","M5 2h9l5 5v19H5z M14 2v6h5 M8 13h8 M8 17h8 M8 21h5");svg.append(path);return svg;}
+function invalidateReferences() {
+  const draft = referenceDrafts.get(selected);
+  if (!draft) return;
+  draft.generation++; draft.snapshot=null; draft.busy=false; draft.error="";
+  draft.paint?.();
+}
+function referencePanel(view) {
+  const project=view.project;
+  let draft=referenceDrafts.get(project.id);
+  if (!draft) { draft={ids:[],pick:"",open:false,snapshot:null,busy:false,error:"",generation:0}; referenceDrafts.set(project.id,draft); }
+  const panel=node("details",undefined,"context-references"); panel.open=draft.open;
+  panel.addEventListener("toggle",()=>{draft.open=panel.open;});
+  const summary=node("summary","Preparar referencias"); panel.append(summary);
+  const body=node("div"); panel.append(body);
+  function changeSelection(ids) {
+    draft.ids=ids; draft.generation++; draft.snapshot=null; draft.busy=false; draft.error=""; paint();
+  }
+  function paint() {
+    body.replaceChildren();
+    body.append(node("p","Elige archivos de todo el proyecto, en el orden que quieras compartirlos. Los filtros y las carpetas no cambian esta selección.","muted"));
+    const picker=node("div",undefined,"context-picker"),label=node("label","Archivo registrado"),select=node("select"); select.id="context-file";
+    const placeholder=node("option","Selecciona un archivo…"); placeholder.value=""; select.append(placeholder);
+    for(const file of view.files.filter(file=>!draft.ids.includes(file.id))) {
+      const option=node("option",`${file.title} · ${file.relative_path||file.path}${file.external?" · Externo, sólo lectura":""}${file.exists?"":" · No encontrado"}`);
+      option.value=file.id; select.append(option);
+    }
+    select.value=draft.pick; select.addEventListener("change",()=>{draft.pick=select.value;add.disabled=!draft.pick||draft.ids.length>=20;});
+    label.append(select); const add=button("Añadir a la selección",()=>{if(!draft.pick||draft.ids.length>=20)return;const id=draft.pick;draft.pick="";changeSelection([...draft.ids,id]);});
+    add.disabled=!draft.pick||draft.ids.length>=20; picker.append(label,add); body.append(picker);
+    body.append(node("p",`${draft.ids.length} de 20 archivos seleccionados`,"context-count"));
+    const chosen=node("ol",undefined,"context-selection");
+    for(const id of draft.ids) {
+      const file=view.files.find(file=>file.id===id),item=node("li"),description=node("div");
+      description.append(node("strong",file?.title||`Archivo #${id}`),node("p",file?.relative_path||file?.path||"Ya no figura en este proyecto; retíralo para preparar otra selección.","path"));
+      const remove=button("Quitar",()=>changeSelection(draft.ids.filter(value=>value!==id)),"quiet");remove.setAttribute("aria-label",`Quitar ${file?.title||id} de la selección`);
+      item.append(description,remove);chosen.append(item);
+    }
+    body.append(chosen);
+    if(!draft.ids.length)body.append(node("p","Sin archivos, se preparan sólo los datos del proyecto.","muted"));
+    body.append(node("p","Preparar lee los originales para actualizar hash, tamaño y fecha de modificación de los archivos elegidos. No los modifica ni abre aplicaciones. El JSON contiene referencias y metadatos, no el contenido de los archivos.","context-help muted"));
+    const prepare=button(draft.busy?"Preparando referencias…":"Preparar JSON",async()=>{
+      const generation=++draft.generation,ids=[...draft.ids]; draft.busy=true;draft.snapshot=null;draft.error="";paint();
+      try {
+        const snapshot=await globalThis.atlasCopilotContext.referenceSnapshot(fetch,project.id,ids);
+        if(generation!==draft.generation||selected!==project.id)return;
+        draft.snapshot=snapshot;
+      } catch(error) { if(generation===draft.generation&&selected===project.id)draft.error=error.message; }
+      finally { if(generation===draft.generation&&selected===project.id){draft.busy=false;draft.paint();} }
+    });
+    prepare.disabled=draft.busy;body.append(prepare);
+    if(draft.error){const error=node("p",draft.error,"reference-feedback");error.setAttribute("role","alert");body.append(error);}
+    if(!draft.snapshot)return;
+    const snapshot=draft.snapshot,context=snapshot.context,result=node("section",undefined,"context-result");result.setAttribute("aria-label","Referencias preparadas");
+    result.append(node("h3","Referencias preparadas"),node("p",`${project.name} · ${context.sphere} · ${context.members.map(appName).join(" · ")}`),node("p",context.goal||"Sin objetivo indicado.","muted"),node("p",`Preparado: ${new Date(context.assembled_at*1000).toLocaleString()}`,"muted"));
+    const files=node("ul",undefined,"context-file-summary");
+    for(const file of context.files){
+      const item=node("li");item.append(node("strong",file.title),node("p",file.path,"path"),node("p",`${file.exists?"En su ruta":"No encontrado; revisión registrada, sin comprobar el original"}${file.external?" · Externo, sólo lectura":""}`,file.exists?"muted":"state"),node("p",`Revisión registrada: ${file.revision}`,"path"));files.append(item);
+    }
+    result.append(files,node("p","Respuesta JSON nativa completa {ok, tool, result}. Copiar y descargar conservan el mismo texto original, incluidos los enteros de las fechas de modificación.","context-help muted"));
+    const actions=node("div",undefined,"form-actions"),feedback=node("p","","reference-feedback");feedback.setAttribute("role","status");
+    actions.append(button("Copiar JSON",async()=>{try{await navigator.clipboard.writeText(snapshot.raw);feedback.textContent="JSON de referencias copiado.";}catch(error){feedback.textContent="No se pudo copiar. Abre el texto JSON, selecciónalo y usa Ctrl+C.";}}),button("Descargar JSON",()=>{
+      const url=URL.createObjectURL(new Blob([snapshot.raw],{type:"application/json;charset=utf-8"})),link=node("a");link.href=url;link.download=`atlas-referencias-${project.id}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);feedback.textContent="Descarga del JSON iniciada.";
+    }));
+    const rawDetails=node("details"),rawLabel=node("label","Respuesta JSON de Atlas"),raw=node("textarea");raw.readOnly=true;raw.rows=9;raw.value=snapshot.raw;rawLabel.append(raw);rawDetails.append(node("summary","Ver texto JSON completo"),rawLabel);
+    result.append(actions,feedback,rawDetails);body.append(result);
+  }
+  draft.paint=paint;paint();return panel;
+}
+function referenceFormSnapshot() {
+  const draft=referenceDrafts.get(selected);
+  if(projectTab!=="files"||!draft?.open)return null;
+  const context=draft.snapshot?.context;
+  return {form:"context",mode:"prepare",project_id:selected,fields:{file_ids:[...draft.ids],pending_file_id:draft.pick},preparing:draft.busy,
+    ...(context?{prepared:{project_id:context.project_id,assembled_at:context.assembled_at,files:context.files.map(file=>({id:file.id,title:file.title,revision:file.revision,exists:file.exists}))}}:{})};
+}
 function searchPanel(view) {
   const project = view.project, panel = node("section", undefined, "file-search");
   panel.setAttribute("aria-label", "Buscar archivos del proyecto");
@@ -156,7 +232,7 @@ function searchPanel(view) {
   if (searchState.result) run(searchState.result);
   return panel;
 }
-function render(view) {const focus=captureProjectEditorFocus();const main=$("#main");main.replaceChildren();projectEditorElement=null;const p=view.project;const title=node("section",undefined,"project-title");const heading=node("div",undefined,"project-heading"),edit=button(projectEditorOpen?"Cerrar edición":"Editar proyecto",async()=>{if(projectEditorOpen){projectEditorOpen=false;if(projectEditorElement)projectEditorElement.hidden=true;edit.textContent="Editar proyecto";edit.setAttribute("aria-expanded","false");return;}projectEditorOpen=true;edit.disabled=true;const updated=await refreshInPlace();if(selected===p.id){if(updated)$("#project-edit-name")?.focus();else{projectEditorOpen=false;message("No se pudieron leer los datos del proyecto. Prueba de nuevo.",true);}}edit.disabled=false;});edit.id="edit-project";edit.setAttribute("aria-expanded",String(projectEditorOpen));heading.append(node("h2",p.name),edit);title.append(heading);if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);if(projectEditorOpen){projectEditorElement=projectEditorPanel(p);main.append(projectEditorElement);restoreProjectEditorFocus(focus);}const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}main.append(searchPanel(view));
+function render(view) {const focus=captureProjectEditorFocus();const main=$("#main");main.replaceChildren();projectEditorElement=null;const p=view.project;const title=node("section",undefined,"project-title");const heading=node("div",undefined,"project-heading"),edit=button(projectEditorOpen?"Cerrar edición":"Editar proyecto",async()=>{if(projectEditorOpen){projectEditorOpen=false;if(projectEditorElement)projectEditorElement.hidden=true;edit.textContent="Editar proyecto";edit.setAttribute("aria-expanded","false");return;}projectEditorOpen=true;edit.disabled=true;const updated=await refreshInPlace();if(selected===p.id){if(updated)$("#project-edit-name")?.focus();else{projectEditorOpen=false;message("No se pudieron leer los datos del proyecto. Prueba de nuevo.",true);}}edit.disabled=false;});edit.id="edit-project";edit.setAttribute("aria-expanded",String(projectEditorOpen));heading.append(node("h2",p.name),edit);title.append(heading);if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);if(projectEditorOpen){projectEditorElement=projectEditorPanel(p);main.append(projectEditorElement);restoreProjectEditorFocus(focus);}const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}main.append(referencePanel(view),searchPanel(view));
 const folders=node("nav",undefined,"folders");folders.setAttribute("aria-label","Carpetas del proyecto");for(const [key,label] of [["shared","Compartidos"],...p.members.map(a=>[a,appName(a)])]){const b=button(label,()=>{area=key;render(view);});b.setAttribute("aria-pressed",String(area===key));folders.append(b);}main.append(folders);
 const folder=area==="shared"?p.shared_path:p.hoard_paths[area];const location=node("section",undefined,"location");location.setAttribute("aria-label","Ruta de la carpeta seleccionada");location.append(node("p",folder,"path"),button("Copiar ruta",()=>copy(folder)));main.append(location);
 const bar=node("div",undefined,"file-header");bar.append(node("h3",area==="shared"?"Archivos compartidos":`Archivos de ${appName(area)}`),button("Registrar archivo",()=>{$("#file-panel").hidden=!$("#file-panel").hidden;if(!$("#file-panel").hidden)$("#relative-path").focus();}));main.append(bar);
@@ -173,6 +249,7 @@ const CREATE_DEFAULTS = {name: "", owner: "faustus", members: "", sphere: "perso
 function captureFileDraft() {const panel=$("#file-panel"),input=$("#relative-path");if(!panel||!input||panel.hidden)return null;return {value:input.value,focused:document.activeElement===input,start:input.selectionStart,end:input.selectionEnd};}
 function restoreFileDraft(draft) {if(!draft)return;const panel=$("#file-panel"),input=$("#relative-path");if(!panel||!input)return;panel.hidden=false;input.value=draft.value;if(draft.focused){input.focus();try{input.setSelectionRange(draft.start,draft.end);}catch(e){}}}
 async function refreshInPlace() {
+  invalidateReferences();
   try {
     const status = await api("/api/status");
     projects = status.projects; $("#disk-root").textContent = status.root; projectNavigation();
@@ -220,7 +297,7 @@ async function copilotContext() {
 }
 if (typeof window !== "undefined" && globalThis.atlasCopilotContext) {
   window.addEventListener("atlas:context-request", e => {
-    for (const snapshot of [createFormSnapshot(), fileFormSnapshot(), projectFormSnapshot(), globalThis.atlasExternalReferences.snapshot()]) if (snapshot) e.detail.provide(snapshot);
+    for (const snapshot of [createFormSnapshot(), fileFormSnapshot(), projectFormSnapshot(), referenceFormSnapshot(), globalThis.atlasExternalReferences.snapshot()]) if (snapshot) e.detail.provide(snapshot);
   });
   const scheduleRefresh = globalThis.atlasCopilotContext.debounced(refreshInPlace, 250);
   window.addEventListener("hoard:copilot-turn-end", scheduleRefresh);

@@ -84,7 +84,20 @@
     return out;
   }
 
-  const api = { changedFields, projectDraft, refreshProjectDraft, editProjectDraft, editorContext, debounced, buildContext };
+  // Export the original response text, not a re-serialization of JS numbers:
+  // native filesystem timestamps can exceed Number.MAX_SAFE_INTEGER.
+  async function referenceSnapshot(fetcher, projectId, fileIds) {
+    const response = await fetcher("/api/agent/call", {
+      method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:"atlas_context", arguments:{project_id:projectId, file_ids:[...fileIds]}}),
+    });
+    const raw = await response.text();
+    const envelope = JSON.parse(raw);
+    if (!response.ok || envelope.ok === false) throw new Error(envelope.error || "No se pudieron preparar las referencias. Prueba de nuevo.");
+    return {raw, context:envelope.result.context};
+  }
+
+  const api = { changedFields, projectDraft, refreshProjectDraft, editProjectDraft, editorContext, debounced, buildContext, referenceSnapshot };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.atlasCopilotContext = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

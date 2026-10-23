@@ -7,6 +7,24 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const CC = require('../atlas_hoard/ui/copilot-context.js');
 
+test('reference exports keep the native JSON text and unsafe integers without reserializing', async () => {
+  const raw = '{"ok": true, "tool": "atlas_context", "result": {"ok": true, "context": {"project_id": "p1", "goal": "Café \\"borrador\\"", "files": [{"id": "f2", "mtime_ns": 1792761234567890123, "path": "C:\\\\ficticio\\\\a.txt"}, {"id": "f1", "mtime_ns": 1792761234567890125}]}}}';
+  let request;
+  const snapshot = await CC.referenceSnapshot(async (path, options) => {
+    request={path, ...options};
+    return {ok:true, text:async()=>raw, json:async()=>assert.fail('export must capture the original response text')};
+  }, 'p1', ['f2','f1']);
+  assert.equal(snapshot.raw, raw);
+  assert.notEqual(JSON.stringify(JSON.parse(raw)), raw);
+  assert.ok(snapshot.raw.includes('1792761234567890123'));
+  assert.ok(snapshot.raw.includes('1792761234567890125'));
+  assert.equal(snapshot.context.goal, 'Café "borrador"');
+  assert.deepEqual(JSON.parse(request.body), {name:'atlas_context',arguments:{project_id:'p1',file_ids:['f2','f1']}});
+  assert.equal(request.path, '/api/agent/call');
+  assert.equal(request.credentials, 'same-origin');
+  await assert.rejects(CC.referenceSnapshot(async()=>({ok:false,text:async()=>' {"ok":false,"error":"archivo no disponible"}'}),'p1',['f2']), /archivo no disponible/);
+});
+
 test('changedFields returns only edited fields', () => {
   assert.deepEqual(CC.changedFields({ a: 1, b: [1, 2], c: 'x' }, { a: 1, b: [1, 2], c: 'y', d: 'new' }), { c: 'y', d: 'new' });
   assert.deepEqual(CC.changedFields(undefined, { a: 1 }), { a: 1 });
@@ -65,7 +83,8 @@ class Element {
   replaceChildren(...v) { this.children = v; }
   setAttribute(k, v) { this.attributes[k] = v; }
   removeAttribute(k) { delete this.attributes[k]; }
-  addEventListener() {}
+  addEventListener(type, listener) { (this.listeners ||= {})[type]=listener; }
+  fire(type) { return this.listeners?.[type]?.({preventDefault(){}}); }
   focus() {}
   setSelectionRange() {}
 }
@@ -94,6 +113,37 @@ const project = { id: 'p1', name: 'Lanzamiento', sphere: 'work', owner: 'writer'
 const ok = result => ({ ok: true, json: async () => ({ ok: true, result }) });
 const plain = x => JSON.parse(JSON.stringify(x));
 const tick = () => new Promise(r => setTimeout(r, 20));
+
+test('reference selection survives filters and refresh, retries errors and rejects late snapshots', async () => {
+  let release;
+  const app=boot({projects:[project],handler:body=>body.name==='atlas_context'
+    ?new Promise(resolve=>{release=resolve;})
+    :ok({project,files:[{id:'f1',title:'Uno',path:'/disk/uno',exists:true},{id:'f2',title:'Dos',path:'/disk/dos',exists:true}]})});
+  await tick();
+  const panel=()=>vm.runInContext('referencePanel({project:activeProject,files:[{id:"f1",title:"Uno",path:"/disk/uno",exists:true},{id:"f2",title:"Dos",path:"/disk/dos",exists:true}]})',app.context);
+  const walk=(el,predicate)=>predicate(el)?el:el.children.map(child=>walk(child,predicate)).find(Boolean);
+  const control=(el,text)=>walk(el,child=>child.textContent===text);
+  const add=(el,id)=>{const select=walk(el,child=>child.id==='context-file');select.value=id;select.fire('change');control(el,'Añadir a la selección').fire('click');};
+  let element=panel();add(element,'f1');
+  const stale=control(element,'Preparar JSON').fire('click');
+  add(element,'f2');
+  release({ok:true,text:async()=>' {"ok":true,"result":{"context":{"project_id":"p1","files":[]}}}'});
+  await stale;
+  assert.equal(vm.runInContext('referenceDrafts.get("p1").snapshot',app.context),null);
+  vm.runInContext('area="writer"',app.context);element=panel();
+  assert.match(walk(element,child=>child.className==='context-count').textContent,/2 de 20/);
+  const failed=control(element,'Preparar JSON').fire('click');
+  release({ok:false,text:async()=>' {"ok":false,"error":"Fallo ficticio; reintenta"}'});await failed;
+  assert.ok(control(element,'Fallo ficticio; reintenta'));
+  assert.deepEqual(plain(vm.runInContext('referenceDrafts.get("p1").ids',app.context)),['f1','f2']);
+  const retry=control(element,'Preparar JSON').fire('click');
+  vm.runInContext('invalidateReferences(); selected="otro"',app.context);
+  release({ok:true,text:async()=>' {"ok":true,"result":{"context":{"project_id":"p1","files":[]}}}'});await retry;
+  assert.equal(vm.runInContext('referenceDrafts.get("p1").snapshot',app.context),null);
+  vm.runInContext('selected="p1"',app.context);
+  await app.window.hoardCopilot.onTurnEnd();await new Promise(resolve=>setTimeout(resolve,320));
+  assert.deepEqual(plain(vm.runInContext('referenceDrafts.get("p1").ids',app.context)),['f1','f2']);
+});
 
 test('context() reads the open project through the app API and includes unsaved forms', async () => {
   const app = boot({ projects: [project], handler: () => ok({ project, files: [{ id: 'f1', title: 'a.png', relative_path: 'shared/a.png', app: 'writer', revision: 'r', state: 'available', exists: true, path: '/d/p1/shared/a.png' }] }) });

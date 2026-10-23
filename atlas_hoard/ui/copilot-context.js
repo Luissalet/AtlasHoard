@@ -10,6 +10,34 @@
     return Object.fromEntries(Object.entries(draft || {}).filter(([key, value]) => !same(value, base[key])));
   }
 
+  const projectFields = project => ({name:project.name, goal:project.goal, members:[...project.members].sort(), state:project.state});
+  const inputValue = (key, value, owner) => key === "members" ? value.filter(id => id !== owner).join(", ") : value;
+  function projectPatch(draft) {
+    const values = {name:draft.values.name.trim(), goal:draft.values.goal.trim(),
+      members:[...new Set([draft.owner,...draft.values.members.split(",").map(id=>id.trim().toLowerCase()).filter(Boolean)])].sort(),
+      state:draft.values.state};
+    const patch = changedFields(draft.baseline, values);
+    if (JSON.stringify(patch) !== JSON.stringify(draft.patch)) draft.requestId = null;
+    draft.patch = patch;
+  }
+  function projectDraft(project) {
+    const baseline = projectFields(project);
+    return {owner:project.owner, baseline, values:Object.fromEntries(Object.entries(baseline).map(([key,value])=>[key,inputValue(key,value,project.owner)])), patch:{}, requestId:null, saving:false};
+  }
+  function refreshProjectDraft(draft, project) {
+    const latest = projectFields(project);
+    for (const [key,value] of Object.entries(latest)) {
+      if (!(key in draft.patch)) draft.values[key] = inputValue(key,value,project.owner);
+    }
+    draft.baseline = latest;
+    projectPatch(draft);
+    return draft;
+  }
+  function editProjectDraft(draft, key, value) {
+    draft.values[key] = value;
+    projectPatch(draft);
+  }
+
   // Ask every open form for its unsaved fields. Each form answers with
   // detail.provide({form, mode, fields, ...}); answers are keyed by form name.
   function editorContext(target, detail) {
@@ -55,7 +83,7 @@
     return out;
   }
 
-  const api = { changedFields, editorContext, debounced, buildContext };
+  const api = { changedFields, projectDraft, refreshProjectDraft, editProjectDraft, editorContext, debounced, buildContext };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.atlasCopilotContext = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

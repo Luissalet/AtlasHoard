@@ -1,5 +1,19 @@
 # Atlas's Hoard
 
+**Editar proyecto**, junto al título, permite cambiar nombre, objetivo opcional,
+otros Hoards participantes y estado en curso/archivado. Usa `atlas_project_update`
+existente y envía sólo los campos cambiados; vaciar el objetivo lo borra. Al abrir
+de nuevo o refrescar tras el asistente, los campos intactos se actualizan y los
+editados conservan su borrador, foco y cursor. Cerrar la edición guarda el borrador
+de esta sesión; **Descartar cambios** lo descarta. El contexto del asistente
+incluye los campos sin guardar.
+
+Renombrar no mueve la carpeta. Responsable, ámbito y rutas/revisiones/IDs de los
+archivos se conservan. El responsable permanece como miembro. Retirar otro Hoard
+conserva sus carpetas/archivos y, si su carpeta estaba abierta, vuelve a Compartidos
+al guardar. Los proyectos archivados siguen en la navegación con su etiqueta y se
+pueden reactivar desde el mismo editor. No cambia el backend ni los permisos.
+
 En **Resultados reutilizables**, cada proyecto muestra sus salidas registradas,
 la receta completa y las revisiones de los archivos de origen. **Comprobar ahora**
 verifica los hashes actuales: el listado comienza como pendiente de comprobar.

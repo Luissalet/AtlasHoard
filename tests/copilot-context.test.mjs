@@ -12,6 +12,20 @@ test('changedFields returns only edited fields', () => {
   assert.deepEqual(CC.changedFields(undefined, { a: 1 }), { a: 1 });
 });
 
+test('project editor keeps dirty empty goal and rebases untouched concurrent fields', () => {
+  const p={name:'Original',goal:'Old goal',owner:'writer',members:['writer','lumiere'],state:'active'};
+  const draft=CC.projectDraft(p);
+  CC.editProjectDraft(draft,'goal','');draft.requestId='old-request';
+  CC.refreshProjectDraft(draft,{...p,name:'Changed by assistant',members:['writer','borges'],state:'archived'});
+  assert.equal(draft.values.name,'Changed by assistant');assert.equal(draft.values.members,'borges');
+  assert.equal(draft.values.state,'archived');assert.equal(draft.values.goal,'');
+  assert.deepEqual(draft.patch,{goal:''});assert.equal(draft.requestId,'old-request');
+  CC.editProjectDraft(draft,'members','LUMIERE, borges, lumiere');
+  assert.deepEqual(draft.patch,{goal:'',members:['borges','lumiere','writer']});assert.equal(draft.requestId,null);
+  CC.editProjectDraft(draft,'goal','Old goal');
+  assert.deepEqual(draft.patch,{members:['borges','lumiere','writer']});
+});
+
 test('editorContext collects answers keyed by form and is undefined without forms', () => {
   const target = new EventTarget();
   assert.equal(CC.editorContext(target), undefined);

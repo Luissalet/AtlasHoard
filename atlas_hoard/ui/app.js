@@ -2,6 +2,8 @@
 const $ = (s) => document.querySelector(s);
 let projects = [], selected = null, area = "shared", activeProject = null, loadGeneration = 0;
 let projectTab = "files";
+let projectEditorOpen = false, projectEditorElement = null;
+const projectDrafts = new Map();
 let searchState = {query: "", area: "all", availability: "all", result: null}, searchGeneration = 0;
 const labels = {faustus:"Faustus",writer:"Writer",lumiere:"Lumiere",prospero:"Prospero",borges:"Borges",kafka:"Kafka",daguerre:"Daguerre",scheherazade:"Scheherazade"};
 const appName = (id) => labels[id] || id;
@@ -11,8 +13,60 @@ async function api(path, body) {const res=await fetch(path,{method:body?"POST":"
 const call=(name,arguments_)=>api("/api/agent/call",{name:`atlas_${name}`,arguments:arguments_});
 async function copy(value) {try{await navigator.clipboard.writeText(value);message("Ruta copiada. Puedes usarla en cualquier aplicación del proyecto.");}catch(e){message("No se pudo copiar. Selecciona la ruta y cópiala con Ctrl+C.",true);}}
 function button(text, action, cls) {const b=node("button",text,cls);b.type="button";b.addEventListener("click",action);return b;}
-function projectNavigation() {const nav=$("#projects");nav.replaceChildren();for(const p of projects){const b=button(p.name,()=>choose(p.id));b.setAttribute("aria-current",String(p.id===selected));b.append(node("small",p.sphere==="work"?"Trabajo":p.sphere==="freelance"?"Autónomo":"Personal"));nav.append(b);}if(!projects.length)nav.append(node("p","Todavía no hay proyectos.","muted"));}
-async function choose(id) {selected=id;area="shared";projectTab="files";searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
+function captureProjectEditorFocus() {
+  const field=document.activeElement;
+  if(!projectEditorElement?.contains(field)||!field.name)return null;
+  return {name:field.name,start:field.selectionStart,end:field.selectionEnd};
+}
+function restoreProjectEditorFocus(focus) {
+  if(!focus||!projectEditorElement)return;
+  const field=projectEditorElement.querySelector(`[name="${focus.name}"]`);
+  if(!field)return;
+  field.focus();try{field.setSelectionRange(focus.start,focus.end);}catch(e){}
+}
+function projectEditorPanel(project) {
+  const CC=globalThis.atlasCopilotContext;
+  const draft=projectDrafts.get(project.id)||CC.projectDraft(project);
+  projectDrafts.set(project.id,draft);CC.refreshProjectDraft(draft,project);
+  const panel=node("section",undefined,"project-editor");panel.setAttribute("aria-label","Editar proyecto");
+  panel.append(node("h3","Datos del proyecto"));
+  const facts=node("dl",undefined,"project-facts");
+  for(const [label,value] of [["Responsable",`${appName(project.owner)} (${project.owner})`],["Ámbito",({personal:"Personal",work:"Trabajo",freelance:"Autónomo"})[project.sphere]||project.sphere],["Carpeta del proyecto",project.path]]){
+    facts.append(node("dt",label),node("dd",value,label==="Carpeta del proyecto"?"path":undefined));
+  }
+  panel.append(facts,node("p","Cambiar el nombre no mueve la carpeta. El responsable y las rutas se conservan.","muted"));
+  const form=node("form"),fields=node("fieldset",undefined,"project-edit-fields");fields.disabled=draft.saving;
+  fields.append(node("legend","Nombre, objetivo y organización"));
+  function field(key,label,tag="input",wide=false) {
+    const group=node("label",label,wide?"wide":undefined),input=node(tag);input.name=key;input.id=`project-edit-${key}`;
+    if(key==="state")for(const [value,text] of [["active","En curso"],["archived","Archivado"]]){const option=node("option",text);option.value=value;input.append(option);}
+    input.value=draft.values[key];if(key==="name"){input.required=true;input.maxLength=200;}
+    if(key==="goal"){input.rows=3;input.maxLength=2000;}
+    input.addEventListener(tag==="select"?"change":"input",()=>CC.editProjectDraft(draft,key,input.value));group.append(input);fields.append(group);return group;
+  }
+  field("name","Nombre");
+  field("members","Otros Hoards que participan").append(node("small",`IDs separados por comas, por ejemplo writer, lumiere. ${project.owner} permanece como responsable.`));
+  field("goal","Objetivo (opcional)","textarea",true);
+  field("state","Estado","select").append(node("small","Archivar conserva los archivos y permite reactivar el proyecto desde esta misma ficha."));
+  fields.append(node("p","Añadir un Hoard prepara su carpeta. Retirarlo restringe su acceso por la API; sus archivos y carpetas se conservan.","wide muted"));
+  const actions=node("div",undefined,"form-actions"),submit=node("button",draft.saving?"Guardando…":"Guardar cambios");submit.type="submit";
+  actions.append(submit,button("Descartar cambios",()=>{projectDrafts.delete(project.id);projectEditorOpen=false;panel.hidden=true;const toggle=$("#edit-project");if(toggle){toggle.textContent="Editar proyecto";toggle.setAttribute("aria-expanded","false");toggle.focus();}},"quiet"));
+  fields.append(actions);form.append(fields);panel.append(form);
+  form.addEventListener("submit",async event=>{
+    event.preventDefault();const patch={...draft.patch};
+    if(!Object.keys(patch).length){message("No hay cambios que guardar.");return;}
+    draft.requestId ||= crypto.randomUUID();draft.saving=true;fields.disabled=true;submit.textContent="Guardando…";
+    try {
+      const result=await call("project_update",{project_id:project.id,...patch,request_id:draft.requestId});
+      projectDrafts.delete(project.id);projects=projects.map(p=>p.id===project.id?result.project:p);projectNavigation();
+      if(selected===project.id){projectEditorOpen=false;message("Proyecto actualizado. Los archivos siguen en sus rutas.");await refreshInPlace();}
+    }catch(error){if(selected===project.id)message(error.message,true);}
+    finally{draft.saving=false;fields.disabled=false;submit.textContent="Guardar cambios";if(selected===project.id&&projectEditorElement!==panel){const latest=projectEditorElement?.querySelector("fieldset");if(latest)latest.disabled=false;const latestSubmit=projectEditorElement?.querySelector('[type="submit"]');if(latestSubmit)latestSubmit.textContent="Guardar cambios";}}
+  });
+  return panel;
+}
+function projectNavigation() {const nav=$("#projects");nav.replaceChildren();for(const p of projects){const b=button(p.name,()=>choose(p.id));b.setAttribute("aria-current",String(p.id===selected));b.append(node("small",(p.sphere==="work"?"Trabajo":p.sphere==="freelance"?"Autónomo":"Personal")+(p.state==="archived"?" · Archivado":"")));nav.append(b);}if(!projects.length)nav.append(node("p","Todavía no hay proyectos.","muted"));}
+async function choose(id) {selected=id;area="shared";projectTab="files";projectEditorOpen=false;searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
 async function showProject() {if(!selected)return;const requestedId=selected,generation=++loadGeneration;activeProject=null;const loading=node("section",undefined,"empty");loading.append(node("h2","Cargando archivos del proyecto…"));$("#main").replaceChildren(loading);$("#main").setAttribute("aria-busy","true");try{const view=await call("project",{project_id:requestedId});if(generation!==loadGeneration||selected!==requestedId)return;activeProject=view.project;render(view);}catch(e){if(generation===loadGeneration&&selected===requestedId){loading.replaceChildren(node("p","No se pudo abrir el proyecto. Selecciónalo de nuevo para reintentar."));message(e.message,true);}}finally{if(generation===loadGeneration)$("#main").removeAttribute("aria-busy");}}
 function icon() {const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 28");svg.setAttribute("aria-hidden","true");const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("d","M5 2h9l5 5v19H5z M14 2v6h5 M8 13h8 M8 17h8 M8 21h5");svg.append(path);return svg;}
 function searchPanel(view) {
@@ -72,7 +126,7 @@ function searchPanel(view) {
   if (searchState.result) run(searchState.result);
   return panel;
 }
-function render(view) {const main=$("#main");main.replaceChildren();const p=view.project;const title=node("section",undefined,"project-title");title.append(node("h2",p.name));if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}main.append(searchPanel(view));
+function render(view) {const focus=captureProjectEditorFocus();const main=$("#main");main.replaceChildren();projectEditorElement=null;const p=view.project;const title=node("section",undefined,"project-title");const heading=node("div",undefined,"project-heading"),edit=button(projectEditorOpen?"Cerrar edición":"Editar proyecto",async()=>{if(projectEditorOpen){projectEditorOpen=false;if(projectEditorElement)projectEditorElement.hidden=true;edit.textContent="Editar proyecto";edit.setAttribute("aria-expanded","false");return;}projectEditorOpen=true;edit.disabled=true;const updated=await refreshInPlace();if(selected===p.id){if(updated)$("#project-edit-name")?.focus();else{projectEditorOpen=false;message("No se pudieron leer los datos del proyecto. Prueba de nuevo.",true);}}edit.disabled=false;});edit.id="edit-project";edit.setAttribute("aria-expanded",String(projectEditorOpen));heading.append(node("h2",p.name),edit);title.append(heading);if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);if(projectEditorOpen){projectEditorElement=projectEditorPanel(p);main.append(projectEditorElement);restoreProjectEditorFocus(focus);}const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}main.append(searchPanel(view));
 const folders=node("nav",undefined,"folders");folders.setAttribute("aria-label","Carpetas del proyecto");for(const [key,label] of [["shared","Compartidos"],...p.members.map(a=>[a,appName(a)])]){const b=button(label,()=>{area=key;render(view);});b.setAttribute("aria-pressed",String(area===key));folders.append(b);}main.append(folders);
 const folder=area==="shared"?p.shared_path:p.hoard_paths[area];const location=node("section",undefined,"location");location.setAttribute("aria-label","Ruta de la carpeta seleccionada");location.append(node("p",folder,"path"),button("Copiar ruta",()=>copy(folder)));main.append(location);
 const bar=node("div",undefined,"file-header");bar.append(node("h3",area==="shared"?"Archivos compartidos":`Archivos de ${appName(area)}`),button("Registrar archivo",()=>{$("#file-panel").hidden=!$("#file-panel").hidden;if(!$("#file-panel").hidden)$("#relative-path").focus();}));main.append(bar);
@@ -82,7 +136,7 @@ const members=node("section",undefined,"members");members.append(node("h3","Trab
 async function refresh() {try{const status=await api("/api/status");projects=status.projects;$("#disk-root").textContent=status.root;projectNavigation();if(projects.length&&!selected)selected=projects[0].id;if(selected){projectNavigation();await showProject();}}catch(e){message("No se pudo leer el disco compartido. "+e.message,true);}}
 $("#new-project").addEventListener("click",()=>{$("#create-panel").hidden=false;$("#create-form input").focus();});$("#cancel-create").addEventListener("click",()=>{$("#create-panel").hidden=true;});
 $("#create-form").addEventListener("input",e=>{delete e.currentTarget.dataset.requestId;});
-$("#create-form").addEventListener("submit",async e=>{e.preventDefault();const form=e.currentTarget,submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const values=Object.fromEntries(new FormData(form));const members=[...new Set([values.owner.trim().toLowerCase(),...values.members.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean)])];form.dataset.requestId ||= crypto.randomUUID();const result=await call("project_create",{name:values.name,owner:values.owner.trim().toLowerCase(),members,sphere:values.sphere,goal:values.goal,request_id:form.dataset.requestId});selected=result.project.id;area="shared";$("#create-panel").hidden=true;form.reset();delete form.dataset.requestId;message("Proyecto creado. Copia la ruta de su carpeta y empieza a guardar archivos allí.");await refresh();}catch(err){message(err.message,true);}finally{submit.disabled=false;}});
+$("#create-form").addEventListener("submit",async e=>{e.preventDefault();const form=e.currentTarget,submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const values=Object.fromEntries(new FormData(form));const members=[...new Set([values.owner.trim().toLowerCase(),...values.members.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean)])];form.dataset.requestId ||= crypto.randomUUID();const result=await call("project_create",{name:values.name,owner:values.owner.trim().toLowerCase(),members,sphere:values.sphere,goal:values.goal,request_id:form.dataset.requestId});selected=result.project.id;area="shared";projectEditorOpen=false;$("#create-panel").hidden=true;form.reset();delete form.dataset.requestId;message("Proyecto creado. Copia la ruta de su carpeta y empieza a guardar archivos allí.");await refresh();}catch(err){message(err.message,true);}finally{submit.disabled=false;}});
 // --- Family assistant contract: real context of the open view and in-place refresh ---
 const CREATE_DEFAULTS = {name: "", owner: "faustus", members: "", sphere: "personal", goal: ""};
 function captureFileDraft() {const panel=$("#file-panel"),input=$("#relative-path");if(!panel||!input||panel.hidden)return null;return {value:input.value,focused:document.activeElement===input,start:input.selectionStart,end:input.selectionEnd};}
@@ -98,7 +152,8 @@ async function refreshInPlace() {
     if (area !== "shared" && !view.project.members.includes(area)) area = "shared";
     const draft = captureFileDraft();
     activeProject = view.project; render(view); restoreFileDraft(draft);
-  } catch (e) { /* keep the current view; the next turn refreshes again */ }
+    return true;
+  } catch (e) { /* keep the current view; the next turn refreshes again */ return false; }
 }
 function createFormSnapshot() {
   const panel = $("#create-panel"); if (!panel || panel.hidden) return null;
@@ -108,6 +163,10 @@ function createFormSnapshot() {
 function fileFormSnapshot() {
   const panel = $("#file-panel"), input = $("#relative-path"); if (!panel || !input || panel.hidden) return null;
   return {form: "file_register", mode: "create", project_id: selected, area, fields: globalThis.atlasCopilotContext.changedFields({relative_path: ""}, {relative_path: input.value})};
+}
+function projectFormSnapshot() {
+  const draft=projectDrafts.get(selected);if(!projectEditorOpen||!projectEditorElement?.isConnected||projectEditorElement.hidden||!draft||!Object.keys(draft.patch).length)return null;
+  return {form:"project_update",mode:"edit",project_id:selected,fields:draft.patch};
 }
 async function copilotContext() {
   const CC = globalThis.atlasCopilotContext;
@@ -128,7 +187,7 @@ async function copilotContext() {
 }
 if (typeof window !== "undefined" && globalThis.atlasCopilotContext) {
   window.addEventListener("atlas:context-request", e => {
-    for (const snapshot of [createFormSnapshot(), fileFormSnapshot()]) if (snapshot) e.detail.provide(snapshot);
+    for (const snapshot of [createFormSnapshot(), fileFormSnapshot(), projectFormSnapshot()]) if (snapshot) e.detail.provide(snapshot);
   });
   const scheduleRefresh = globalThis.atlasCopilotContext.debounced(refreshInPlace, 250);
   window.addEventListener("hoard:copilot-turn-end", scheduleRefresh);

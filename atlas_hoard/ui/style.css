@@ -35,6 +35,27 @@
 .project-filter .form-actions{display:flex;flex-wrap:wrap;gap:8px}
 .project-filter button{padding-inline:10px;font-size:13px}
 #project-filter-status,#project-filter-selection{font-size:13px;margin:12px 0;overflow-wrap:anywhere}
+.context-references{margin:0 0 24px;padding:0 0 24px;border-bottom:1px solid var(--hoard-border);min-width:0}
+.context-references summary{cursor:pointer;min-height:42px;padding:8px 0;font-weight:600}
+.context-references summary:focus-visible,.context-references textarea:focus-visible{outline:2px solid var(--hoard-accent);outline-offset:3px}
+.context-references p{margin:8px 0;overflow-wrap:anywhere}
+.context-references>div>p,.context-help{max-width:75ch}
+.context-picker{display:flex;align-items:flex-end;gap:12px;margin:20px 0 12px;flex-wrap:wrap}
+.context-picker label{flex:1;min-width:0}
+.context-picker select{width:100%;min-width:0}
+.context-count{font-variant-numeric:tabular-nums;font-size:13px;color:var(--hoard-text-muted)}
+.context-selection{padding-left:24px;margin:12px 0 20px}
+.context-selection li{padding:10px 0;border-bottom:1px solid var(--hoard-border)}
+.context-selection li>div{display:inline-block;width:calc(100% - 100px);vertical-align:middle;overflow-wrap:anywhere}
+.context-selection button{margin-left:12px;vertical-align:middle}
+.context-help{font-size:13px}
+.context-result{margin-top:24px;padding-top:20px;border-top:1px solid var(--hoard-border)}
+.context-file-summary{list-style:none;margin:20px 0;padding:0}
+.context-file-summary li{padding:12px 0;border-bottom:1px solid var(--hoard-border);overflow-wrap:anywhere}
+.context-result .form-actions{flex-wrap:wrap;margin-top:20px}
+.context-result textarea{display:block;width:100%;min-width:0;padding:12px;background:var(--hoard-sunken);color:var(--hoard-text);font:12px/1.6 var(--hoard-font-mono);border:1px solid var(--hoard-border);border-radius:var(--hoard-radius-sm);resize:vertical;caret-color:var(--hoard-accent);white-space:pre-wrap;overflow-wrap:anywhere}
+.context-result details{margin-top:16px}
+@media(max-width:520px){.context-picker label{flex-basis:100%}.context-picker button{width:100%}.context-selection li>div{display:block;width:100%}.context-selection button{margin:8px 0 0}.context-result .form-actions button{flex:1}}
 #project-filter-status{font-variant-numeric:tabular-nums}
 @media(max-width:760px){.project-filter{grid-template-columns:repeat(2,minmax(0,1fr))}.project-filter>.wide{grid-column:1/-1}.project-filter .form-actions{margin-top:0}}
 .external-references>.file-header{flex-wrap:wrap;margin-bottom:10px}

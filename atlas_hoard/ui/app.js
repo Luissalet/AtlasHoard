@@ -1,6 +1,7 @@
 "use strict";
 const $ = (s) => document.querySelector(s);
 let projects = [], selected = null, area = "shared", activeProject = null, loadGeneration = 0;
+let projectTab = "files";
 let searchState = {query: "", area: "all", availability: "all", result: null}, searchGeneration = 0;
 const labels = {faustus:"Faustus",writer:"Writer",lumiere:"Lumiere",prospero:"Prospero",borges:"Borges",kafka:"Kafka",daguerre:"Daguerre",scheherazade:"Scheherazade"};
 const appName = (id) => labels[id] || id;
@@ -11,7 +12,7 @@ const call=(name,arguments_)=>api("/api/agent/call",{name:`atlas_${name}`,argume
 async function copy(value) {try{await navigator.clipboard.writeText(value);message("Ruta copiada. Puedes usarla en cualquier aplicación del proyecto.");}catch(e){message("No se pudo copiar. Selecciona la ruta y cópiala con Ctrl+C.",true);}}
 function button(text, action, cls) {const b=node("button",text,cls);b.type="button";b.addEventListener("click",action);return b;}
 function projectNavigation() {const nav=$("#projects");nav.replaceChildren();for(const p of projects){const b=button(p.name,()=>choose(p.id));b.setAttribute("aria-current",String(p.id===selected));b.append(node("small",p.sphere==="work"?"Trabajo":p.sphere==="freelance"?"Autónomo":"Personal"));nav.append(b);}if(!projects.length)nav.append(node("p","Todavía no hay proyectos.","muted"));}
-async function choose(id) {selected=id;area="shared";searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
+async function choose(id) {selected=id;area="shared";projectTab="files";searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
 async function showProject() {if(!selected)return;const requestedId=selected,generation=++loadGeneration;activeProject=null;const loading=node("section",undefined,"empty");loading.append(node("h2","Cargando archivos del proyecto…"));$("#main").replaceChildren(loading);$("#main").setAttribute("aria-busy","true");try{const view=await call("project",{project_id:requestedId});if(generation!==loadGeneration||selected!==requestedId)return;activeProject=view.project;render(view);}catch(e){if(generation===loadGeneration&&selected===requestedId){loading.replaceChildren(node("p","No se pudo abrir el proyecto. Selecciónalo de nuevo para reintentar."));message(e.message,true);}}finally{if(generation===loadGeneration)$("#main").removeAttribute("aria-busy");}}
 function icon() {const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 28");svg.setAttribute("aria-hidden","true");const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("d","M5 2h9l5 5v19H5z M14 2v6h5 M8 13h8 M8 17h8 M8 21h5");svg.append(path);return svg;}
 function searchPanel(view) {
@@ -71,7 +72,7 @@ function searchPanel(view) {
   if (searchState.result) run(searchState.result);
   return panel;
 }
-function render(view) {const main=$("#main");main.replaceChildren();const p=view.project;const title=node("section",undefined,"project-title");title.append(node("h2",p.name));if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title,searchPanel(view));
+function render(view) {const main=$("#main");main.replaceChildren();const p=view.project;const title=node("section",undefined,"project-title");title.append(node("h2",p.name));if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}main.append(searchPanel(view));
 const folders=node("nav",undefined,"folders");folders.setAttribute("aria-label","Carpetas del proyecto");for(const [key,label] of [["shared","Compartidos"],...p.members.map(a=>[a,appName(a)])]){const b=button(label,()=>{area=key;render(view);});b.setAttribute("aria-pressed",String(area===key));folders.append(b);}main.append(folders);
 const folder=area==="shared"?p.shared_path:p.hoard_paths[area];const location=node("section",undefined,"location");location.setAttribute("aria-label","Ruta de la carpeta seleccionada");location.append(node("p",folder,"path"),button("Copiar ruta",()=>copy(folder)));main.append(location);
 const bar=node("div",undefined,"file-header");bar.append(node("h3",area==="shared"?"Archivos compartidos":`Archivos de ${appName(area)}`),button("Registrar archivo",()=>{$("#file-panel").hidden=!$("#file-panel").hidden;if(!$("#file-panel").hidden)$("#relative-path").focus();}));main.append(bar);
@@ -112,7 +113,7 @@ async function copilotContext() {
   const CC = globalThis.atlasCopilotContext;
   try {
     // Everything mutable is captured before the first await: navigating while the fetch is pending must not mix two views.
-    const openId = selected, openArea = area;
+    const openId = selected, openArea = area, openTab = projectTab;
     const openSearch = searchState.result && {query:searchState.result.query,area:searchState.result.area,availability:searchState.result.availability,total:searchState.result.total};
     const editor = CC.editorContext(window);
     let view = null;
@@ -120,7 +121,8 @@ async function copilotContext() {
     const prefix = openArea === "shared" ? "shared/" : `hoards/${openArea}/`;
     const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix)) : [];
     const context = CC.buildContext({view, area: openArea, files, editor});
-    if (openSearch) context.view.search = openSearch;
+    context.view.project_tab = openTab;
+    if (openSearch && openTab === "files") context.view.search = openSearch;
     return context;
   } catch (e) { return {active_objects: [], view: {page: "home"}}; }
 }

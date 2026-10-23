@@ -78,6 +78,7 @@ def make_server(store, token, port=0):
                 return self.reply(relay.inject_html((UI / "index.html").read_bytes()), content_type="text/html; charset=utf-8", cookie=True)
             static = {"/icon.png": (UI / "icon.png", "image/png"),
                       "/app.js": (UI / "app.js", "text/javascript; charset=utf-8"),
+                      "/derived-results.js": (UI / "derived-results.js", "text/javascript; charset=utf-8"),
                       "/copilot-context.js": (UI / "copilot-context.js", "text/javascript; charset=utf-8"),
                       "/style.css": (UI / "style.css", "text/css; charset=utf-8"),
                       "/hoard-theme.css": (Path(__file__).parent / "hoard_link/ui/hoard-theme.css", "text/css; charset=utf-8")}

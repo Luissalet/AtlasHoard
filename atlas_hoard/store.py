@@ -464,6 +464,20 @@ class Workspace:
         key = hashlib.sha256(canonical({"project": project["id"], "sources": sources, "recipe": recipe}).encode()).hexdigest()
         return project, sources, recipe, key
 
+    def derived_results(self, args, caller):
+        """Describe saved provenance without refreshing hashes or declaring freshness."""
+        project = self._project(args.get("project_id"), caller)
+        results = []
+        for row in self.db.execute("SELECT * FROM results WHERE project_id=? ORDER BY created DESC, id", (project["id"],)):
+            sources = json.loads(row["sources"])
+            output, _ = self._file(row["output_id"], caller, project["id"])
+            inputs = [self._file_view(self._file(source["id"], caller, project["id"])[0], project) for source in sources]
+            results.append({"id": row["id"], "cache_key": row["cache_key"], "recipe": json.loads(row["recipe"]),
+                            "source_revisions": sources, "output_revision": row["output_revision"],
+                            "recorded_state": row["state"], "created": row["created"],
+                            "output": self._file_view(output, project), "sources": inputs})
+        return {"ok": True, "project_id": project["id"], "freshness": "unchecked", "results": results}
+
     def derived_publish(self, args, caller):
         def publish():
             project, sources, recipe, key = self._sources(args, caller)
@@ -520,6 +534,7 @@ class Workspace:
                     "atlas_location": self.location, "atlas_file_register": self.file_register, "atlas_files_search": self.file_search,
                     "atlas_file_resolve": self.file_resolve, "atlas_file_import": self.file_import,
                     "atlas_file_link_source": self.file_link_source,
+                    "atlas_derived_results": self.derived_results,
                     "atlas_derived_publish": self.derived_publish, "atlas_derived_lookup": self.derived_lookup,
                     "atlas_context": self.context}
         if tool not in handlers:

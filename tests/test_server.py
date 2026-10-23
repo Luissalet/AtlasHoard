@@ -43,7 +43,7 @@ def test_health_is_public_catalogue_and_calls_are_authenticated(app):
     assert http(base, "/api/agent/call", {"name": "atlas_projects"})[0] == 401
     code, body, _ = http(base, "/api/agent/tools", headers={"Authorization": "Bearer operator-token"})
     tools = json.loads(body)["tools"]
-    assert code == 200 and len(tools) == 13
+    assert code == 200 and len(tools) == 14
     linked = next(tool for tool in tools if tool["name"] == "atlas_file_link_source")
     assert linked["inputSchema"]["required"] == ["project_id", "source_path"]
 
@@ -97,6 +97,9 @@ def test_copilot_context_script_is_served_and_wired_into_the_page(app):
     assert headers["Content-Type"].startswith("text/javascript")
     page = http(base, "/")[1].decode()
     assert page.index("/copilot-context.js") < page.index("/app.js")
+    code, raw, _ = http(base, "/derived-results.js")
+    assert code == 200 and b"atlasDerivedResults" in raw
+    assert page.index("/derived-results.js") < page.index("/app.js")
 
 def test_shared_assistant_launcher_is_injected_and_its_routes_are_guarded(app):
     base, store = app

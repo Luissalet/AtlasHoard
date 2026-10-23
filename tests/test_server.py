@@ -100,6 +100,10 @@ def test_copilot_context_script_is_served_and_wired_into_the_page(app):
     code, raw, _ = http(base, "/derived-results.js")
     assert code == 200 and b"atlasDerivedResults" in raw
     assert page.index("/derived-results.js") < page.index("/app.js")
+    code, raw, headers = http(base, "/external-references.js")
+    assert code == 200 and b"atlasExternalReferences" in raw
+    assert headers["Content-Type"].startswith("text/javascript")
+    assert page.index("/external-references.js") < page.index("/app.js")
 
 def test_shared_assistant_launcher_is_injected_and_its_routes_are_guarded(app):
     base, store = app

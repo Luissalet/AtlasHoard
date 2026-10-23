@@ -86,6 +86,7 @@ function boot({ projects, handler }) {
   class FormData { constructor(form) { this.form = form; } [Symbol.iterator]() { return Object.entries(this.form.values)[Symbol.iterator](); } }
   const context = vm.createContext({ document, window, fetch, FormData, CustomEvent, EventTarget, setTimeout, clearTimeout, console });
   vm.runInContext(fs.readFileSync('atlas_hoard/ui/copilot-context.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('atlas_hoard/ui/external-references.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('atlas_hoard/ui/app.js', 'utf8'), context);
   return { elements, window, calls, context, q: s => document.querySelector(s) };
 }

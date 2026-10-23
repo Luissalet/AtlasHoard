@@ -1,5 +1,17 @@
 # Atlas's Hoard
 
+La barra de **Proyectos** permite buscar por todas las palabras del nombre y del
+objetivo, sin distinguir mayúsculas ni acentos, y filtrar por estado y ámbito.
+Muestra el recuento, **Limpiar filtros** y un aviso si el proyecto abierto queda
+fuera del resultado. Filtrar conserva ese proyecto y sus formularios sin guardar;
+el refresco mantiene los filtros y una respuesta antigua no sustituye a la nueva.
+Un error identifica la lista anterior y ofrece **Reintentar**. La operación nativa
+API/MCP `atlas_projects` admite `query`, `state` (`active`/`archived`) y `sphere`
+opcionales, conservando la respuesta `projects` y las llamadas sin argumentos.
+Lee todos los proyectos accesibles, incluidos los anteriores al antiguo corte
+global de1000registros. No busca archivos ni su contenido, no calcula huellas y no
+modifica proyectos, carpetas o rutas. El catálogo conserva sus14herramientas.
+
 En **Archivos**, **Añadir referencia externa** registra una ruta absoluta de un
 archivo que permanece fuera de la carpeta del proyecto, con título opcional y
 Hoard participante. **Referencias externas del proyecto** muestra siempre esas

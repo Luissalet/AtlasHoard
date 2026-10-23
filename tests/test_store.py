@@ -25,6 +25,24 @@ def register(store, p, relative, data=b"original", caller="writer"):
     return result["file"]
 
 
+def test_project_search_finds_old_accessible_metadata_without_a_global_cutoff(store):
+    old = project(store, name="Energía Ártica", goal="Cubiertas solares", sphere="work")
+    store.dispatch("atlas_project_update", {"project_id": old["id"], "state": "archived"}, "writer")
+    # Newer inaccessible metadata must not hide the caller's earlier project.
+    store.db.executemany("INSERT INTO projects VALUES (?,?,?,?,?,?,?,?,?)", [
+        (f"hidden-{i}", "Otro proyecto", f"hidden-{i}", "people", "personal", '["people"]', "", "active", 9999999999+i)
+        for i in range(1001)
+    ])
+    store.db.commit()
+    before = store.db.total_changes
+    args = {"query": "ENERGIA solares", "sphere": "work", "state": "archived"}
+    assert [p["id"] for p in store.dispatch("atlas_projects", args, "writer")["projects"]] == [old["id"]]
+    assert store.dispatch("atlas_projects", {**args, "state": "active"}, "writer")["projects"] == []
+    assert store.dispatch("atlas_projects", args, "people")["projects"] == []
+    assert [p["id"] for p in store.dispatch("atlas_projects", {}, "writer")["projects"]] == [old["id"]]
+    assert store.db.total_changes == before
+
+
 def test_two_native_consumers_open_the_same_live_file_and_see_edits(store):
     p = project(store)
     asset = register(store, p, "shared/cover.png")

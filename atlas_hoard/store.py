@@ -35,6 +35,10 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+def search_text(value):
+    return "".join(c for c in unicodedata.normalize("NFKD", value.casefold()) if not unicodedata.combining(c))
+
+
 def app_id(value):
     if not isinstance(value, str) or not APP.fullmatch(value):
         raise StoreError("invalid application ID")
@@ -276,9 +280,16 @@ class Workspace:
 
     def project_list(self, args, caller):
         sphere = args.get("sphere")
-        rows = self.db.execute("SELECT * FROM projects ORDER BY created DESC LIMIT 1000").fetchall()
+        state = args.get("state")
+        if state not in (None, "", "active", "archived"):
+            raise StoreError("state must be active or archived")
+        terms = search_text(text(args.get("query", ""), "query", 200)).split()
+        rows = self.db.execute("SELECT * FROM projects ORDER BY created DESC")
         return {"ok": True, "projects": [self._project_view(r) for r in rows
-                if (caller in ADMIN or caller in json.loads(r["members"])) and (not sphere or r["sphere"] == sphere)]}
+                if (caller in ADMIN or caller in json.loads(r["members"]))
+                and (not sphere or r["sphere"] == sphere)
+                and (not state or r["state"] == state)
+                and all(term in search_text(r["name"] + " " + r["goal"]) for term in terms)]}
 
     def project_get(self, args, caller):
         project = self._project(args.get("project_id"), caller)
@@ -297,15 +308,13 @@ class Workspace:
         limit, offset = args.get("limit", 100), args.get("offset", 0)
         if type(limit) is not int or not 1 <= limit <= 200 or type(offset) is not int or offset < 0:
             raise StoreError("limit must be 1..200 and offset a nonnegative integer")
-        def normalize(value):
-            return "".join(c for c in unicodedata.normalize("NFKD", value.casefold()) if not unicodedata.combining(c))
-        terms = normalize(query).split()
+        terms = search_text(query).split()
         prefix = "shared/" if area == "shared" else f"hoards/{area}/"
         matches = []
         for row in self.db.execute("SELECT * FROM files WHERE project_id=? ORDER BY relative_path", (project["id"],)):
             if area != "all" and not row["relative_path"].startswith(prefix):
                 continue
-            haystack = normalize(row["title"] + " " + row["relative_path"] + " " + (row["external_path"] or ""))
+            haystack = search_text(row["title"] + " " + row["relative_path"] + " " + (row["external_path"] or ""))
             if not all(term in haystack for term in terms):
                 continue
             file = self._file_view(row, project)

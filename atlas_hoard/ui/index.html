@@ -13,6 +13,14 @@
 <label>Ámbito<select name="sphere"><option value="personal">Personal</option><option value="work">Trabajo</option><option value="freelance">Autónomo</option></select></label>
 <label class="wide">Objetivo<input name="goal" maxlength="2000" placeholder="Qué quieres conseguir con este proyecto"></label>
 <div class="form-actions"><button type="submit">Crear proyecto</button><button type="button" id="cancel-create" class="quiet">Cancelar</button></div></form></section>
-<div class="workspace"><aside><h2>Proyectos</h2><nav id="projects" aria-label="Proyectos compartidos"></nav><p class="disk-label">Carpeta del disco</p><p id="disk-root" class="path"></p></aside>
+<div class="workspace"><aside><h2>Proyectos</h2>
+<form id="project-filter-form" class="project-filter" aria-label="Filtrar proyectos">
+<label class="wide">Nombre u objetivo<input id="project-query" type="search" maxlength="200" placeholder="Buscar proyectos"></label>
+<label>Estado<select id="project-state"><option value="">Todos</option><option value="active">En curso</option><option value="archived">Archivados</option></select></label>
+<label>Ámbito<select id="project-sphere"><option value="">Todos</option><option value="personal">Personal</option><option value="work">Trabajo</option><option value="freelance">Autónomo</option></select></label>
+<div class="form-actions wide"><button id="project-filter-submit" type="submit">Filtrar</button><button id="project-filter-reset" class="quiet" type="button">Limpiar filtros</button></div>
+</form>
+<p id="project-filter-status" class="muted" role="status" aria-live="polite"></p><p id="project-filter-selection" class="muted" hidden></p>
+<nav id="projects" aria-label="Proyectos compartidos"></nav><p class="disk-label">Carpeta del disco</p><p id="disk-root" class="path"></p></aside>
 <main id="main"><section class="empty"><h2>Una carpeta para trabajar juntos</h2><p>Crea un proyecto para guardar archivos compartidos y los proyectos nativos de cada Hoard.</p><p>Las aplicaciones abrirán el mismo archivo desde la misma ruta.</p></section></main></div>
 </body></html>

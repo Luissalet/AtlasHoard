@@ -5,6 +5,11 @@
 .app-brand{display:flex;align-items:center;gap:14px;min-width:0}.app-brand img{flex-shrink:0;object-fit:contain}@media(max-width:480px){.app-brand{gap:9px}.app-brand img{width:36px;height:36px}}
 
 .file-search{padding-bottom:24px;margin-bottom:24px;border-bottom:1px solid var(--hoard-border)}
+.file-details{padding:0 0 24px;margin-bottom:24px;border-bottom:1px solid var(--hoard-border);scroll-margin-top:24px}
+.file-details .file-header{align-items:flex-start}.file-details h3{overflow-wrap:anywhere}
+.file-details>p{max-width:75ch;font-size:14px}.file-details .form-actions{flex-wrap:wrap;margin-top:18px}
+.file-row-actions button{display:block}.file-row-actions button+button{margin-top:8px}
+@media(max-width:760px){.file-details{padding-bottom:72px}.file-details .file-header{flex-wrap:wrap}}
 .file-search>p{margin-top:6px;font-size:12px;max-width:72ch}
 .search-form{grid-template-columns:minmax(180px,2fr) minmax(120px,1fr) minmax(150px,1fr) auto auto;gap:12px;align-items:end;margin-top:16px}
 .search-form button{white-space:nowrap}

@@ -12,6 +12,16 @@ Local shared storage for the Hoard family: ordinary project folders containing
 shared live files and each application's native files. All project members
 resolve the same original path; registering a PNG never copies or edits it.
 
+**File details:** internal file rows and search results offer **Ver detalles**.
+The inline sheet shows the registered ID, URI, path, application, SHA-256 revision
+and size; opening it does not recalculate hashes. **Copiar referencia** copies
+the native `hoard://atlas/file/<id>` URI. **Actualizar metadatos** explicitly uses
+the existing `atlas_file_resolve` API/MCP operation: it reads original bytes and
+updates their recorded metadata without opening an application or modifying the
+file. A missing file keeps its last recorded revision/size, clearly labelled.
+The existing 512MiB inspection limit and concurrent-change errors still apply.
+This adds no version history, content viewer, watcher or new backend/tool.
+
 Run `python -m atlas_hoard` (Python 3.11+, standard library only), then open
 `http://127.0.0.1:5203`. `--root PATH` selects the shared disk on first launch.
 Metadata lives separately in `data/`. Windows includes a launcher.

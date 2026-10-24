@@ -50,8 +50,10 @@ function fileRegistrationPanel(view) {
       if(relative.toLowerCase().startsWith(base.toLowerCase()))relative=relative.slice(base.length);
       return call("file_register",{project_id:p.id,relative_path:relative,app:openArea==="shared"?p.owner:openArea,title:values.title,request_id:requestId});
     },()=>crypto.randomUUID());
-    if(selected!==p.id||area!==openArea||projectTab!=="files"||activeProject?.id!==p.id)return;
-    const focus=captureFileDraft();$("#file-registration")?.replaceWith(fileRegistrationPanel(view));restoreFileDraft(focus);
+    if(selected!==p.id||activeProject?.id!==p.id)return;
+    if(area===openArea&&projectTab==="files"){
+      const focus=captureFileDraft();$("#file-registration")?.replaceWith(fileRegistrationPanel(view));restoreFileDraft(focus);
+    }
     if(ok)await refreshInPlace();
   });
   return section;

@@ -142,6 +142,34 @@ const ok = result => ({ ok: true, json: async () => ({ ok: true, result }) });
 const plain = x => JSON.parse(JSON.stringify(x));
 const tick = () => new Promise(r => setTimeout(r, 20));
 
+test('file details reads one native identity and keeps another selection and registration draft after a late response', async()=>{
+  const a={id:'file-a',title:'Archivo A',app:'writer',relative_path:'shared/a.txt',path:'/d/p1/shared/a.txt',uri:'hoard://atlas/file/file-a',revision:'sha256:old-a',size:1,exists:true};
+  const b={...a,id:'file-b',title:'Archivo B',relative_path:'hoards/writer/b.txt',uri:'hoard://atlas/file/file-b',revision:'sha256:b',size:2,exists:false};
+  let files=[a,b],resolve,reads=0;
+  const app=boot({projects:[project],handler:body=>{
+    if(body.name==='atlas_file_resolve'){assert.deepEqual(plain(body.arguments),{file_id:a.id});return new Promise(done=>{resolve=()=>{files=[{...a,revision:'sha256:new-a',size:9},b];done(ok({file:files[0]}));};});}
+    reads++;return ok({project,files});
+  }});
+  await tick();app.context.fixture={project,files};
+  vm.runInContext('openFileDetails(fixture.files[0],fixture);fileDrafts.get(JSON.stringify([selected,area])).open=true;atlasCopilotContext.editFileDraft(fileDrafts.get(JSON.stringify([selected,area])),"title","Pending title ñ")',app.context);
+  const walk=(el,predicate)=>predicate(el)?el:el.children?.map(child=>walk(child,predicate)).find(Boolean);
+  let panel=walk(app.q('#main'),el=>el.id==='file-details');
+  assert.equal(reads,1,'opening the sheet must not resolve or reread the original');
+  assert.equal(vm.runInContext('fileDetails.file.uri',app.context),a.uri);
+  const pending=walk(panel,el=>el.tag==='button'&&el.textContent==='Actualizar metadatos').fire('click');
+  vm.runInContext('openFileDetails(fixture.files[1],fixture)',app.context);resolve();await pending;
+  assert.equal(vm.runInContext('fileDetails.file.id',app.context),b.id);
+  assert.equal(vm.runInContext('fileDetails.file.revision',app.context),b.revision);
+  assert.equal(vm.runInContext('fileDetails.checked',app.context),false);
+  assert.equal(vm.runInContext('fileDrafts.get(JSON.stringify([selected,area])).values.title',app.context),'Pending title ñ');
+  panel=walk(app.q('#main'),el=>el.id==='file-details');
+  assert.ok(walk(panel,el=>el.textContent==='La revisión y el tamaño corresponden al último registro disponible, no al contenido actual de un archivo ausente.'));
+  const context=await app.window.hoardCopilot.context();
+  assert.equal(context.view.file_details.object_id,b.id);assert.equal(context.view.file_details.metadata_source,'registered');
+  assert.ok(context.active_objects.some(o=>o.object_id===b.id),'selected file outside the current folder stays in the final context');
+  assert.equal(context.view.editor.file_register.fields.title,'Pending title ñ');
+});
+
 test('accepted registration refreshes the same project after a folder switch without replacing drafts', async () => {
   const p={...project,members:['writer','lumiere'],hoard_paths:{...project.hoard_paths,lumiere:'/d/p1/hoards/lumiere'}};
   const file={id:'new-file',title:'Título enviado',app:'writer',relative_path:'shared/new.txt',path:'/d/p1/shared/new.txt',exists:true};

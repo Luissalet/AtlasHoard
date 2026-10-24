@@ -53,6 +53,7 @@
     try {
       const result = await send(values, requestId);
       draft.receipt = result.file;
+      if (draft.requestId === requestId) draft.requestId = null;
       return true;
     } catch (error) {
       draft.error = `No se pudo registrar «${values.relative_path}»: ${error.message}`;

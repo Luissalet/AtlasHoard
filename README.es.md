@@ -1,5 +1,16 @@
 # Atlas's Hoard
 
+**Ficha de archivo:** las filas internas de carpetas y búsqueda ofrecen **Ver detalles**.
+La ficha muestra ID/URI/ruta/aplicación y revisión SHA-256/tamaño registrados;
+abrirla no recalcula hashes. **Copiar referencia** copia la URI nativa
+`hoard://atlas/file/<id>`. **Actualizar metadatos** llama explícitamente al
+`atlas_file_resolve` existente por API/MCP14: lee bytes del original y actualiza
+sus metadatos, sin modificarlo ni abrir aplicaciones. Si falta, conserva revisión
+y tamaño anteriores y los identifica como registrados. Mantiene el límite nativo
+de inspección512MiB y los errores de cambio concurrente. No añade historial,
+visor de contenido, vigilancia ni herramientas/backend nuevos. Los borradores,
+búsqueda y selección de Preparar referencias se conservan.
+
 **Registrar archivo** admite un título descriptivo opcional para un archivo
 interno nuevo. No cambia su nombre ni su ruta; vacío utiliza el nombre físico.
 Si la ruta ya está registrada, el motor conserva su ID, título y aplicación,

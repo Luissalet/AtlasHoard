@@ -2,6 +2,7 @@
 const $ = (s) => document.querySelector(s);
 let projects = [], selected = null, area = "shared", activeProject = null, loadGeneration = 0;
 let projectTab = "files";
+let fileDetails = null;
 let projectFilters = {query:"",state:"",sphere:""}, projectFilterGeneration = 0, projectFilterTimer;
 let projectEditorOpen = false, projectEditorElement = null;
 const projectDrafts = new Map();
@@ -16,6 +17,43 @@ async function api(path, body) {const res=await fetch(path,{method:body?"POST":"
 const call=(name,arguments_)=>api("/api/agent/call",{name:`atlas_${name}`,arguments:arguments_});
 async function copy(value) {try{await navigator.clipboard.writeText(value);message("Ruta copiada. Puedes usarla en cualquier aplicación del proyecto.");return true;}catch(e){message("No se pudo copiar. Selecciona la ruta y cópiala con Ctrl+C.",true);return false;}}
 function button(text, action, cls) {const b=node("button",text,cls);b.type="button";b.addEventListener("click",action);return b;}
+function openFileDetails(file, view) {
+  fileDetails={projectId:view.project.id,file,busy:false,checked:false,error:""};
+  render(view);
+  $("#file-details")?.scrollIntoView?.({block:"nearest"});
+  $("#file-details-title")?.focus();
+}
+function fileDetailsPanel(view) {
+  const details=fileDetails;
+  if(!details||details.projectId!==view.project.id)return null;
+  const latest=view.files.find(file=>file.id===details.file.id);
+  if(!latest){fileDetails=null;return null;}
+  details.file=latest;
+  const panel=node("section",undefined,"file-details");panel.id="file-details";panel.setAttribute("aria-labelledby","file-details-title");
+  drawFileDetails(panel,details);return panel;
+}
+function drawFileDetails(panel, details) {
+  panel.replaceChildren();const file=details.file;
+  const heading=node("div",undefined,"file-header"),title=node("h3",file.title);title.id="file-details-title";title.tabIndex=-1;
+  heading.append(title,button("Cerrar ficha",()=>{if(fileDetails===details){fileDetails=null;panel.hidden=true;panel.replaceChildren();}},"quiet"));
+  const facts=node("dl",undefined,"project-facts");
+  for(const[label,value,cls]of [["Identificador",file.id,"path"],["Proyecto",details.projectId,"path"],["Aplicación",appName(file.app)],["Ruta original",file.path,"path"],["Referencia",file.uri,"path"],["Revisión registrada",file.revision,"path"],["Tamaño registrado",`${file.size} bytes`],["Disponibilidad",file.exists?"En su ruta":"No encontrado en disco"]])facts.append(node("dt",label),node("dd",value,cls));
+  panel.append(heading,node("p","Metadatos registrados. Abrir esta ficha no recalcula el hash ni abre el archivo.","muted"),facts,
+    node("p",file.exists?"Actualizar metadatos lee el original para registrar su SHA-256 y tamaño actuales; no lo modifica ni abre aplicaciones.":"La revisión y el tamaño corresponden al último registro disponible, no al contenido actual de un archivo ausente.","muted"));
+  const feedback=node("p",details.error||(details.busy?"Leyendo el archivo original…":details.checked?(file.exists?"Metadatos actualizados desde el original.":"No encontrado. Se conservan la revisión y el tamaño registrados."):""),"reference-feedback");feedback.setAttribute("role",details.error?"alert":"status");
+  const actions=node("div",undefined,"form-actions");
+  actions.append(button("Copiar referencia",async()=>{try{await navigator.clipboard.writeText(file.uri);feedback.textContent="Referencia copiada.";}catch(error){feedback.textContent="No se pudo copiar. Selecciona la referencia y usa Ctrl+C.";}}));
+  const update=button(details.busy?"Actualizando…":"Actualizar metadatos",async()=>{
+    details.busy=true;details.error="";drawFileDetails(panel,details);
+    try{
+      const result=await call("file_resolve",{file_id:file.id});details.file=result.file;details.checked=true;
+      if(fileDetails===details&&selected===details.projectId&&projectTab==="files")drawFileDetails($("#file-details"),details);
+      // Refresh native metadata in the current project even if another file is now open.
+      if(selected===details.projectId)await refreshInPlace();
+    }catch(error){details.error=error.message;}
+    finally{details.busy=false;if(fileDetails===details&&selected===details.projectId&&projectTab==="files")drawFileDetails($("#file-details"),details);}
+  });update.disabled=details.busy;actions.append(update);panel.append(actions,feedback);
+}
 function fileRegistrationPanel(view) {
   const p=view.project, openArea=area, key=JSON.stringify([p.id,openArea]), CC=globalThis.atlasCopilotContext;
   const draft=fileDrafts.get(key)||CC.fileDraft();fileDrafts.set(key,draft);
@@ -140,7 +178,7 @@ $("#project-query").addEventListener("input",()=>updateProjectFilters(true));
 for(const selector of ["#project-state","#project-sphere"])$(selector).addEventListener("change",()=>updateProjectFilters());
 $("#project-filter-form").addEventListener("submit",event=>{event.preventDefault();updateProjectFilters();});
 $("#project-filter-reset").addEventListener("click",()=>{$("#project-query").value="";$("#project-state").value="";$("#project-sphere").value="";updateProjectFilters();});
-async function choose(id) {invalidateReferences();selected=id;area="shared";projectTab="files";projectEditorOpen=false;searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
+async function choose(id) {invalidateReferences();fileDetails=null;selected=id;area="shared";projectTab="files";projectEditorOpen=false;searchState={query:"",area:"all",availability:"all",result:null};searchGeneration++;projectNavigation();await showProject();}
 async function showProject() {invalidateReferences();if(!selected)return;const requestedId=selected,generation=++loadGeneration;activeProject=null;const loading=node("section",undefined,"empty");loading.append(node("h2","Cargando archivos del proyecto…"));$("#main").replaceChildren(loading);$("#main").setAttribute("aria-busy","true");try{const view=await call("project",{project_id:requestedId});if(generation!==loadGeneration||selected!==requestedId)return;activeProject=view.project;render(view);}catch(e){if(generation===loadGeneration&&selected===requestedId){loading.replaceChildren(node("p","No se pudo abrir el proyecto. Selecciónalo de nuevo para reintentar."));message(e.message,true);}}finally{if(generation===loadGeneration)$("#main").removeAttribute("aria-busy");}}
 function icon() {const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 28");svg.setAttribute("aria-hidden","true");const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("d","M5 2h9l5 5v19H5z M14 2v6h5 M8 13h8 M8 17h8 M8 21h5");svg.append(path);return svg;}
 function invalidateReferences() {
@@ -254,7 +292,7 @@ function searchPanel(view) {
       name.append(node("strong", file.title), node("p", file.relative_path || file.source_path));
       if (file.external) name.append(node("p", "Referencia externa · solo lectura"));
       if (!file.exists) name.append(node("p", "No encontrado en disco", "state"));
-      access.append(button("Copiar ruta", () => copy(file.path))); row.append(name, state, access); body.append(row);
+      access.className="file-row-actions";access.append(button("Copiar ruta", () => copy(file.path))); if(!file.external)access.append(button("Ver detalles",()=>openFileDetails(file,view))); row.append(name, state, access); body.append(row);
     }
     table.append(body); wrap.append(table); results.append(wrap);
     const pages = node("div", undefined, "search-pages");
@@ -275,11 +313,11 @@ function searchPanel(view) {
   if (searchState.result) run(searchState.result);
   return panel;
 }
-function render(view) {const focus=captureProjectEditorFocus();const main=$("#main");main.replaceChildren();projectEditorElement=null;const p=view.project;const title=node("section",undefined,"project-title");const heading=node("div",undefined,"project-heading"),edit=button(projectEditorOpen?"Cerrar edición":"Editar proyecto",async()=>{if(projectEditorOpen){projectEditorOpen=false;if(projectEditorElement)projectEditorElement.hidden=true;edit.textContent="Editar proyecto";edit.setAttribute("aria-expanded","false");return;}projectEditorOpen=true;edit.disabled=true;const updated=await refreshInPlace();if(selected===p.id){if(updated)$("#project-edit-name")?.focus();else{projectEditorOpen=false;message("No se pudieron leer los datos del proyecto. Prueba de nuevo.",true);}}edit.disabled=false;});edit.id="edit-project";edit.setAttribute("aria-expanded",String(projectEditorOpen));heading.append(node("h2",p.name),edit);title.append(heading);if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);if(projectEditorOpen){projectEditorElement=projectEditorPanel(p);main.append(projectEditorElement);restoreProjectEditorFocus(focus);}const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"],["anchors","Anclas / Anchors"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}if(projectTab==="anchors"&&globalThis.atlasAnchors){main.append(globalThis.atlasAnchors.create({view,call,message,copy}));return;}main.append(referencePanel(view),searchPanel(view));
+function render(view) {const focus=captureProjectEditorFocus();const main=$("#main");main.replaceChildren();projectEditorElement=null;const p=view.project;const title=node("section",undefined,"project-title");const heading=node("div",undefined,"project-heading"),edit=button(projectEditorOpen?"Cerrar edición":"Editar proyecto",async()=>{if(projectEditorOpen){projectEditorOpen=false;if(projectEditorElement)projectEditorElement.hidden=true;edit.textContent="Editar proyecto";edit.setAttribute("aria-expanded","false");return;}projectEditorOpen=true;edit.disabled=true;const updated=await refreshInPlace();if(selected===p.id){if(updated)$("#project-edit-name")?.focus();else{projectEditorOpen=false;message("No se pudieron leer los datos del proyecto. Prueba de nuevo.",true);}}edit.disabled=false;});edit.id="edit-project";edit.setAttribute("aria-expanded",String(projectEditorOpen));heading.append(node("h2",p.name),edit);title.append(heading);if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);if(projectEditorOpen){projectEditorElement=projectEditorPanel(p);main.append(projectEditorElement);restoreProjectEditorFocus(focus);}const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"],["anchors","Anclas / Anchors"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}if(projectTab==="anchors"&&globalThis.atlasAnchors){main.append(globalThis.atlasAnchors.create({view,call,message,copy}));return;}main.append(referencePanel(view),searchPanel(view));const inspection=fileDetailsPanel(view);if(inspection)main.append(inspection);
 const folders=node("nav",undefined,"folders");folders.setAttribute("aria-label","Carpetas del proyecto");for(const [key,label] of [["shared","Compartidos"],...p.members.map(a=>[a,appName(a)])]){const b=button(label,()=>{area=key;render(view);});b.setAttribute("aria-pressed",String(area===key));folders.append(b);}main.append(folders);
 const folder=area==="shared"?p.shared_path:p.hoard_paths[area];const location=node("section",undefined,"location");location.setAttribute("aria-label","Ruta de la carpeta seleccionada");location.append(node("p",folder,"path"),button("Copiar ruta",()=>copy(folder)));main.append(location);
 main.append(fileRegistrationPanel(view));
-const prefix=area==="shared"?"shared/":`hoards/${area}/`;const files=view.files.filter(f=>(f.relative_path || "").startsWith(prefix));if(files.length){const wrap=node("div",undefined,"table-wrap"),table=node("table"),head=node("thead"),hr=node("tr");for(const h of ["Archivo","Registrado por","Acceso"])hr.append(node("th",h));head.append(hr);table.append(head);const body=node("tbody");for(const f of files){const row=node("tr"),name=node("td"),line=node("div",undefined,"file-name");const details=node("div");details.append(node("strong",f.title),node("p",f.relative_path));if(!f.exists)details.append(node("p","El archivo no está en su ruta. Comprueba si lo has movido.","state"));line.append(icon(),details);name.append(line);const app=node("td",appName(f.app),"muted"),access=node("td");access.append(button("Copiar ruta",()=>copy(f.path)));row.append(name,app,access);body.append(row);}table.append(body);wrap.append(table);main.append(wrap);}else{const empty=node("section",undefined,"folder-empty");empty.append(node("h3","Esta carpeta está lista para usar"),node("p","Guarda aquí un PNG, un documento o el proyecto nativo de tu aplicación. Después regístralo para que los demás Hoards puedan encontrarlo."));main.append(empty);}
+const prefix=area==="shared"?"shared/":`hoards/${area}/`;const files=view.files.filter(f=>(f.relative_path || "").startsWith(prefix));if(files.length){const wrap=node("div",undefined,"table-wrap"),table=node("table"),head=node("thead"),hr=node("tr");for(const h of ["Archivo","Registrado por","Acceso"])hr.append(node("th",h));head.append(hr);table.append(head);const body=node("tbody");for(const f of files){const row=node("tr"),name=node("td"),line=node("div",undefined,"file-name");const details=node("div");details.append(node("strong",f.title),node("p",f.relative_path));if(!f.exists)details.append(node("p","El archivo no está en su ruta. Comprueba si lo has movido.","state"));line.append(icon(),details);name.append(line);const app=node("td",appName(f.app),"muted"),access=node("td");access.className="file-row-actions";access.append(button("Copiar ruta",()=>copy(f.path)));access.append(button("Ver detalles",()=>openFileDetails(f,view)));row.append(name,app,access);body.append(row);}table.append(body);wrap.append(table);main.append(wrap);}else{const empty=node("section",undefined,"folder-empty");empty.append(node("h3","Esta carpeta está lista para usar"),node("p","Guarda aquí un PNG, un documento o el proyecto nativo de tu aplicación. Después regístralo para que los demás Hoards puedan encontrarlo."));main.append(empty);}
 main.append(globalThis.atlasExternalReferences.create({view,call,copy,refresh:refreshInPlace}));
 const members=node("section",undefined,"members");members.append(node("h3","Trabajan en este proyecto"),node("p",p.members.map(appName).join(" · ")),node("p","Los archivos compartidos son originales de trabajo. Si los editas en otra aplicación, el cambio se ve en la misma ruta."));main.append(members);}
 async function refresh() {try{const status=await api("/api/status");projects=status.projects;$("#disk-root").textContent=status.root;projectNavigation();if(projects.length&&!selected)selected=projects[0].id;if(selected){projectNavigation();await showProject();}}catch(e){message("No se pudo leer el disco compartido. "+e.message,true);}}
@@ -325,15 +363,17 @@ async function copilotContext() {
     // Everything mutable is captured before the first await: navigating while the fetch is pending must not mix two views.
     const openId = selected, openArea = area, openTab = projectTab;
     const openProjectFilters = {...projectFilters};
+    const openFileDetails = openTab === "files" && fileDetails?.projectId === openId ? {object_id:fileDetails.file.id,displayed_revision:fileDetails.file.revision,displayed_exists:fileDetails.file.exists,metadata_source:fileDetails.checked?"last_explicit_refresh":"registered",updating:fileDetails.busy,error:fileDetails.error} : null;
     const openSearch = searchState.result && {query:searchState.result.query,area:searchState.result.area,availability:searchState.result.availability,total:searchState.result.total};
     const editor = CC.editorContext(window);
     let view = null;
     if (openId) { try { view = await call("project", {project_id: openId}); } catch (e) { view = null; } }
     const prefix = openArea === "shared" ? "shared/" : `hoards/${openArea}/`;
-    const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix) || (openTab === "files" && f.external)) : [];
+    const files = view && Array.isArray(view.files) ? view.files.filter(f => (f.relative_path || "").startsWith(prefix) || (openTab === "files" && f.external) || f.id===openFileDetails?.object_id) : [];
     const context = CC.buildContext({view, area: openArea, files, editor});
     context.view.project_tab = openTab;
     context.view.project_filters = openProjectFilters;
+    if(openFileDetails)context.view.file_details=openFileDetails;
     if (openSearch && openTab === "files") context.view.search = openSearch;
     return context;
   } catch (e) { return {active_objects: [], view: {page: "home"}}; }

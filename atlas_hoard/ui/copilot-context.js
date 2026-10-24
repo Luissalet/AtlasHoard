@@ -38,6 +38,28 @@
     projectPatch(draft);
   }
 
+  function fileDraft() {
+    return {values:{relative_path:"",title:""}, open:false, saving:false, requestId:null, receipt:null, error:""};
+  }
+  function editFileDraft(draft, key, value) {
+    draft.values[key] = value;
+    draft.requestId = null;
+  }
+  async function saveFileDraft(draft, send, newRequestId) {
+    const values = {...draft.values};
+    const requestId = draft.requestId ||= newRequestId();
+    draft.saving = true;
+    draft.error = "";
+    try {
+      const result = await send(values, requestId);
+      draft.receipt = result.file;
+      return true;
+    } catch (error) {
+      draft.error = `No se pudo registrar «${values.relative_path}»: ${error.message}`;
+      return false;
+    } finally { draft.saving = false; }
+  }
+
   // Ask every open form for its unsaved fields. Each form answers with
   // detail.provide({form, mode, fields, ...}); answers are keyed by form name.
   function editorContext(target, detail) {
@@ -97,7 +119,7 @@
     return {raw, context:envelope.result.context};
   }
 
-  const api = { changedFields, projectDraft, refreshProjectDraft, editProjectDraft, editorContext, debounced, buildContext, referenceSnapshot };
+  const api = { changedFields, projectDraft, refreshProjectDraft, editProjectDraft, fileDraft, editFileDraft, saveFileDraft, editorContext, debounced, buildContext, referenceSnapshot };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.atlasCopilotContext = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

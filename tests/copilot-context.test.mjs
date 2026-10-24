@@ -7,6 +7,32 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const CC = require('../atlas_hoard/ui/copilot-context.js');
 
+test('registration keeps native receipts separate from later drafts, retries and other folders', async () => {
+  const a=CC.fileDraft(), b=CC.fileDraft();
+  CC.editFileDraft(a,'relative_path','shared/IMG_0042.txt');
+  CC.editFileDraft(a,'title','🧭'.repeat(200));
+  let finish, sent;
+  const pending=CC.saveFileDraft(a,(values,id)=>{sent={values,id};return new Promise(resolve=>{finish=resolve;});},()=> 'first');
+  assert.equal(a.saving,true);
+  CC.editFileDraft(a,'title','Borrador posterior ñ');
+  CC.editFileDraft(b,'title','Otra carpeta');
+  finish({file:{id:'registered',title:'Título nativo previo',relative_path:'shared/IMG_0042.txt',app:'lumiere'}});
+  assert.equal(await pending,true);
+  assert.equal(sent.values.title,'🧭'.repeat(200));
+  assert.equal(a.values.title,'Borrador posterior ñ');
+  assert.equal(a.receipt.title,'Título nativo previo');
+  assert.equal(b.values.title,'Otra carpeta');
+  assert.equal(b.receipt,null);
+  const ids=[];
+  assert.equal(await CC.saveFileDraft(a,async(values,id)=>{ids.push(id);throw new Error('503 ficticio');},()=> 'retry'),false);
+  assert.match(a.error,/IMG_0042.txt.*503 ficticio/);
+  assert.equal(a.values.title,'Borrador posterior ñ');
+  assert.equal(a.receipt.id,'registered');
+  assert.equal(await CC.saveFileDraft(a,async(values,id)=>{ids.push(id);return {file:{id:'registered',title:'Título nativo previo'}};},()=>assert.fail('retry must reuse request ID')),true);
+  assert.deepEqual(ids,['retry','retry']);
+  assert.equal(a.saving,false);
+});
+
 test('reference exports keep the native JSON text and unsafe integers without reserializing', async () => {
   const raw = '{"ok": true, "tool": "atlas_context", "result": {"ok": true, "context": {"project_id": "p1", "goal": "Café \\"borrador\\"", "files": [{"id": "f2", "mtime_ns": 1792761234567890123, "path": "C:\\\\ficticio\\\\a.txt"}, {"id": "f1", "mtime_ns": 1792761234567890125}]}}}';
   let request;
@@ -85,6 +111,7 @@ class Element {
   removeAttribute(k) { delete this.attributes[k]; }
   addEventListener(type, listener) { (this.listeners ||= {})[type]=listener; }
   fire(type) { return this.listeners?.[type]?.({preventDefault(){}}); }
+  contains(element) { return this===element||this.children.some(child=>child.contains?.(element)); }
   focus() {}
   setSelectionRange() {}
 }
@@ -152,11 +179,12 @@ test('context() reads the open project through the app API and includes unsaved 
   app.q('#create-form').values = { name: 'Nuevo', owner: 'faustus', members: '', sphere: 'personal', goal: '' };
   app.q('#file-panel').hidden = false;
   app.q('#relative-path').value = 'shared/b.png';
+  vm.runInContext('atlasCopilotContext.editFileDraft(fileDrafts.get(JSON.stringify(["p1","shared"])),"relative_path","shared/b.png");atlasCopilotContext.editFileDraft(fileDrafts.get(JSON.stringify(["p1","shared"])),"title","Portada ñ")',app.context);
   const ctx = plain(await app.window.hoardCopilot.context());
   assert.equal(ctx.project.external_project_id, 'p1');
   assert.deepEqual(ctx.active_objects.map(o => o.object_id), ['p1', 'f1']);
   assert.deepEqual(ctx.view.editor.project_create.fields, { name: 'Nuevo' });
-  assert.deepEqual(ctx.view.editor.file_register.fields, { relative_path: 'shared/b.png' });
+  assert.deepEqual(ctx.view.editor.file_register.fields, { relative_path: 'shared/b.png', title:'Portada ñ' });
 });
 
 test('context() never throws: fetch errors and unknown ids yield no object', async () => {
@@ -173,11 +201,13 @@ test('turn end refreshes once for both triggers and keeps the half-typed file pa
   const before = app.calls.length;
   app.q('#file-panel').hidden = false;
   app.q('#relative-path').value = 'shared/typed-by-hand.png';
+  vm.runInContext('fileDrafts.get(JSON.stringify(["p1","shared"])).open=true;atlasCopilotContext.editFileDraft(fileDrafts.get(JSON.stringify(["p1","shared"])),"relative_path","shared/typed-by-hand.png");atlasCopilotContext.editFileDraft(fileDrafts.get(JSON.stringify(["p1","shared"])),"title","Título pendiente")',app.context);
   app.window.dispatchEvent(new Event('hoard:copilot-turn-end'));
   app.window.hoardCopilot.onTurnEnd();
   await new Promise(r => setTimeout(r, 400));
   assert.equal(app.calls.length - before, 1);
   assert.equal(app.q('#relative-path').value, 'shared/typed-by-hand.png');
+  assert.deepEqual(plain(vm.runInContext('fileDrafts.get(JSON.stringify(["p1","shared"])).values',app.context)),{relative_path:'shared/typed-by-hand.png',title:'Título pendiente'});
 });
 
 test('context() keeps the folder it started with when the area changes while the project fetch is pending', async () => {
@@ -188,7 +218,7 @@ test('context() keeps the folder it started with when the area changes while the
   ] };
   const app = boot({ projects: [project], handler: () => (hold ? new Promise(r => { release = () => r(ok(view)); }) : ok(view)) });
   await tick();
-  vm.runInContext('area = "writer"', app.context);
+  vm.runInContext('area = "writer";fileRegistrationPanel({project:activeProject});atlasCopilotContext.editFileDraft(fileDrafts.get(JSON.stringify(["p1","writer"])),"relative_path","hoards/writer/x")', app.context);
   app.q('#file-panel').hidden = false;
   app.q('#relative-path').value = 'hoards/writer/x';
   hold = true;

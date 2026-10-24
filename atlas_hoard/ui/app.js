@@ -6,6 +6,7 @@ let projectFilters = {query:"",state:"",sphere:""}, projectFilterGeneration = 0,
 let projectEditorOpen = false, projectEditorElement = null;
 const projectDrafts = new Map();
 const referenceDrafts = new Map();
+const fileDrafts = new Map();
 let searchState = {query: "", area: "all", availability: "all", result: null}, searchGeneration = 0;
 const labels = {faustus:"Faustus",writer:"Writer",lumiere:"Lumiere",prospero:"Prospero",borges:"Borges",kafka:"Kafka",daguerre:"Daguerre",scheherazade:"Scheherazade"};
 const appName = (id) => labels[id] || id;
@@ -15,6 +16,46 @@ async function api(path, body) {const res=await fetch(path,{method:body?"POST":"
 const call=(name,arguments_)=>api("/api/agent/call",{name:`atlas_${name}`,arguments:arguments_});
 async function copy(value) {try{await navigator.clipboard.writeText(value);message("Ruta copiada. Puedes usarla en cualquier aplicación del proyecto.");return true;}catch(e){message("No se pudo copiar. Selecciona la ruta y cópiala con Ctrl+C.",true);return false;}}
 function button(text, action, cls) {const b=node("button",text,cls);b.type="button";b.addEventListener("click",action);return b;}
+function fileRegistrationPanel(view) {
+  const p=view.project, openArea=area, key=JSON.stringify([p.id,openArea]), CC=globalThis.atlasCopilotContext;
+  const draft=fileDrafts.get(key)||CC.fileDraft();fileDrafts.set(key,draft);
+  const section=node("section",undefined,"file-registration");section.id="file-registration";
+  const panel=node("section",undefined,"file-form");panel.id="file-panel";panel.hidden=!draft.open;
+  panel.dataset.projectId=p.id;panel.dataset.area=openArea;
+  const toggle=button("Registrar archivo",()=>{draft.open=!draft.open;panel.hidden=!draft.open;toggle.setAttribute("aria-expanded",String(draft.open));if(draft.open)input.focus();});
+  toggle.setAttribute("aria-expanded",String(draft.open));toggle.setAttribute("aria-controls","file-panel");
+  const bar=node("div",undefined,"file-header");bar.append(node("h3",openArea==="shared"?"Archivos compartidos":`Archivos de ${appName(openArea)}`),toggle);section.append(bar);
+  const form=node("form");form.setAttribute("aria-label","Registrar archivo interno");
+  const label=node("label","Archivo guardado dentro del proyecto"),input=node("input");
+  input.id="relative-path";input.name="relative_path";input.required=true;input.value=draft.values.relative_path;
+  input.placeholder=openArea==="shared"?"shared/portada.png":`hoards/${openArea}/proyecto`;
+  label.append(input,node("small","Ruta del archivo ya guardado. Atlas lee sus bytes para registrar la revisión; no modifica su contenido."));
+  const titleLabel=node("label","Título descriptivo (opcional)"),title=node("input");
+  title.id="file-title";title.name="title";title.value=draft.values.title;
+  titleLabel.append(title,node("small","Identifica el archivo en Atlas; no cambia su nombre ni su ruta. Vacío: se utiliza el nombre del archivo."));
+  for(const field of [input,title])field.addEventListener("input",()=>CC.editFileDraft(draft,field.name,field.value));
+  const help=node("p","Si esta ruta ya está registrada, se actualiza su revisión y se conservan el título y la aplicación anteriores.","muted wide");
+  const actions=node("div",undefined,"form-actions"),submit=node("button",draft.saving?"Registrando…":"Registrar");
+  submit.type="submit";submit.disabled=draft.saving;
+  actions.append(submit,button("Cancelar",()=>{draft.open=false;panel.hidden=true;toggle.setAttribute("aria-expanded","false");toggle.focus();},"quiet"));
+  form.append(label,titleLabel,help,actions);panel.append(form);
+  if(draft.error){const error=node("p",draft.error,"state");error.setAttribute("role","alert");panel.append(error);}
+  section.append(panel);
+  if(draft.receipt){const f=draft.receipt,receipt=node("section",undefined,"registration-receipt");receipt.setAttribute("aria-label","Último registro confirmado");receipt.setAttribute("role","status");receipt.append(node("h3","Registro confirmado"),node("p",f.title),node("p",f.relative_path,"path"),node("p",`Registrado por ${appName(f.app)} · ID ${f.id}`,"muted"));section.append(receipt);}
+  form.addEventListener("submit",async e=>{
+    e.preventDefault();submit.disabled=true;submit.textContent="Registrando…";
+    const ok=await CC.saveFileDraft(draft,async(values,requestId)=>{
+      let relative=values.relative_path.trim().replaceAll("\\","/");
+      const base=p.path.replaceAll("\\","/")+"/";
+      if(relative.toLowerCase().startsWith(base.toLowerCase()))relative=relative.slice(base.length);
+      return call("file_register",{project_id:p.id,relative_path:relative,app:openArea==="shared"?p.owner:openArea,title:values.title,request_id:requestId});
+    },()=>crypto.randomUUID());
+    if(selected!==p.id||area!==openArea||projectTab!=="files"||activeProject?.id!==p.id)return;
+    const focus=captureFileDraft();$("#file-registration")?.replaceWith(fileRegistrationPanel(view));restoreFileDraft(focus);
+    if(ok)await refreshInPlace();
+  });
+  return section;
+}
 function captureProjectEditorFocus() {
   const field=document.activeElement;
   if(!projectEditorElement?.contains(field)||!field.name)return null;
@@ -235,8 +276,7 @@ function searchPanel(view) {
 function render(view) {const focus=captureProjectEditorFocus();const main=$("#main");main.replaceChildren();projectEditorElement=null;const p=view.project;const title=node("section",undefined,"project-title");const heading=node("div",undefined,"project-heading"),edit=button(projectEditorOpen?"Cerrar edición":"Editar proyecto",async()=>{if(projectEditorOpen){projectEditorOpen=false;if(projectEditorElement)projectEditorElement.hidden=true;edit.textContent="Editar proyecto";edit.setAttribute("aria-expanded","false");return;}projectEditorOpen=true;edit.disabled=true;const updated=await refreshInPlace();if(selected===p.id){if(updated)$("#project-edit-name")?.focus();else{projectEditorOpen=false;message("No se pudieron leer los datos del proyecto. Prueba de nuevo.",true);}}edit.disabled=false;});edit.id="edit-project";edit.setAttribute("aria-expanded",String(projectEditorOpen));heading.append(node("h2",p.name),edit);title.append(heading);if(p.goal)title.append(node("p",p.goal));if(p.state==="archived")title.append(node("p","Proyecto archivado; sus archivos se conservan.","state"));main.append(title);if(projectEditorOpen){projectEditorElement=projectEditorPanel(p);main.append(projectEditorElement);restoreProjectEditorFocus(focus);}const tabs=node("nav",undefined,"folders");tabs.setAttribute("aria-label","Vistas del proyecto");for(const [key,label] of [["files","Archivos"],["results","Resultados reutilizables"]]){const b=button(label,()=>{projectTab=key;render(view);});b.setAttribute("aria-pressed",String(projectTab===key));tabs.append(b);}main.append(tabs);if(projectTab==="results"){main.append(globalThis.atlasDerivedResults.create({view,call,message,copy}));return;}main.append(referencePanel(view),searchPanel(view));
 const folders=node("nav",undefined,"folders");folders.setAttribute("aria-label","Carpetas del proyecto");for(const [key,label] of [["shared","Compartidos"],...p.members.map(a=>[a,appName(a)])]){const b=button(label,()=>{area=key;render(view);});b.setAttribute("aria-pressed",String(area===key));folders.append(b);}main.append(folders);
 const folder=area==="shared"?p.shared_path:p.hoard_paths[area];const location=node("section",undefined,"location");location.setAttribute("aria-label","Ruta de la carpeta seleccionada");location.append(node("p",folder,"path"),button("Copiar ruta",()=>copy(folder)));main.append(location);
-const bar=node("div",undefined,"file-header");bar.append(node("h3",area==="shared"?"Archivos compartidos":`Archivos de ${appName(area)}`),button("Registrar archivo",()=>{$("#file-panel").hidden=!$("#file-panel").hidden;if(!$("#file-panel").hidden)$("#relative-path").focus();}));main.append(bar);
-const filePanel=node("section",undefined,"file-form");filePanel.id="file-panel";filePanel.hidden=true;const form=node("form");const label=node("label","Archivo guardado dentro del proyecto");const input=node("input");input.id="relative-path";input.name="relative_path";input.required=true;input.placeholder=area==="shared"?"shared/portada.png":`hoards/${area}/proyecto`;label.append(input,node("small","Registra el archivo para compartir su ruta. Su contenido no se modifica."));const actions=node("div",undefined,"form-actions");const submit=node("button","Registrar");submit.type="submit";actions.append(submit,button("Cancelar",()=>{filePanel.hidden=true;},"quiet"));form.append(label,actions);form.addEventListener("submit",async e=>{e.preventDefault();submit.disabled=true;try{let relative=input.value.trim().replaceAll("\\","/");const base=p.path.replaceAll("\\","/")+"/";if(relative.toLowerCase().startsWith(base.toLowerCase()))relative=relative.slice(base.length);await call("file_register",{project_id:p.id,relative_path:relative,app:area==="shared"?p.owner:area});message("Archivo registrado. Los Hoards del proyecto usarán esta misma ruta.");await showProject();}catch(err){message(err.message,true);}finally{submit.disabled=false;}});filePanel.append(form);main.append(filePanel);
+main.append(fileRegistrationPanel(view));
 const prefix=area==="shared"?"shared/":`hoards/${area}/`;const files=view.files.filter(f=>(f.relative_path || "").startsWith(prefix));if(files.length){const wrap=node("div",undefined,"table-wrap"),table=node("table"),head=node("thead"),hr=node("tr");for(const h of ["Archivo","Registrado por","Acceso"])hr.append(node("th",h));head.append(hr);table.append(head);const body=node("tbody");for(const f of files){const row=node("tr"),name=node("td"),line=node("div",undefined,"file-name");const details=node("div");details.append(node("strong",f.title),node("p",f.relative_path));if(!f.exists)details.append(node("p","El archivo no está en su ruta. Comprueba si lo has movido.","state"));line.append(icon(),details);name.append(line);const app=node("td",appName(f.app),"muted"),access=node("td");access.append(button("Copiar ruta",()=>copy(f.path)));row.append(name,app,access);body.append(row);}table.append(body);wrap.append(table);main.append(wrap);}else{const empty=node("section",undefined,"folder-empty");empty.append(node("h3","Esta carpeta está lista para usar"),node("p","Guarda aquí un PNG, un documento o el proyecto nativo de tu aplicación. Después regístralo para que los demás Hoards puedan encontrarlo."));main.append(empty);}
 main.append(globalThis.atlasExternalReferences.create({view,call,copy,refresh:refreshInPlace}));
 const members=node("section",undefined,"members");members.append(node("h3","Trabajan en este proyecto"),node("p",p.members.map(appName).join(" · ")),node("p","Los archivos compartidos son originales de trabajo. Si los editas en otra aplicación, el cambio se ve en la misma ruta."));main.append(members);}
@@ -246,15 +286,16 @@ $("#create-form").addEventListener("input",e=>{delete e.currentTarget.dataset.re
 $("#create-form").addEventListener("submit",async e=>{e.preventDefault();const form=e.currentTarget,submit=form.querySelector('[type="submit"]');submit.disabled=true;try{const values=Object.fromEntries(new FormData(form));const members=[...new Set([values.owner.trim().toLowerCase(),...values.members.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean)])];form.dataset.requestId ||= crypto.randomUUID();const result=await call("project_create",{name:values.name,owner:values.owner.trim().toLowerCase(),members,sphere:values.sphere,goal:values.goal,request_id:form.dataset.requestId});selected=result.project.id;area="shared";projectEditorOpen=false;$("#create-panel").hidden=true;form.reset();delete form.dataset.requestId;message("Proyecto creado. Copia la ruta de su carpeta y empieza a guardar archivos allí.");await refresh();}catch(err){message(err.message,true);}finally{submit.disabled=false;}});
 // --- Family assistant contract: real context of the open view and in-place refresh ---
 const CREATE_DEFAULTS = {name: "", owner: "faustus", members: "", sphere: "personal", goal: ""};
-function captureFileDraft() {const panel=$("#file-panel"),input=$("#relative-path");if(!panel||!input||panel.hidden)return null;return {value:input.value,focused:document.activeElement===input,start:input.selectionStart,end:input.selectionEnd};}
-function restoreFileDraft(draft) {if(!draft)return;const panel=$("#file-panel"),input=$("#relative-path");if(!panel||!input)return;panel.hidden=false;input.value=draft.value;if(draft.focused){input.focus();try{input.setSelectionRange(draft.start,draft.end);}catch(e){}}}
+function captureFileDraft() {const panel=$("#file-panel");if(!panel||panel.hidden)return null;const field=document.activeElement;return {projectId:panel.dataset.projectId,area:panel.dataset.area,focused:panel.contains(field)?field.name:null,start:field?.selectionStart,end:field?.selectionEnd};}
+function restoreFileDraft(draft) {if(!draft)return;const panel=$("#file-panel");if(!panel||panel.dataset.projectId!==draft.projectId||panel.dataset.area!==draft.area)return;const field=draft.focused&&panel.querySelector(`[name="${draft.focused}"]`);if(field){field.focus();try{field.setSelectionRange(draft.start,draft.end);}catch(e){}}}
 async function refreshInPlace() {
   invalidateReferences();
+  const requestedId=selected,generation=loadGeneration;
   try {
     const status = await api("/api/status");
+    if(generation!==loadGeneration||selected!==requestedId)return false;
     projects = status.projects; $("#disk-root").textContent = status.root; projectNavigation();
-    if (!selected) return;
-    const requestedId = selected, generation = loadGeneration;
+    if (!requestedId) return;
     const view = await call("project", {project_id: requestedId});
     if (generation !== loadGeneration || selected !== requestedId) return;
     if (area !== "shared" && !view.project.members.includes(area)) area = "shared";
@@ -269,8 +310,8 @@ function createFormSnapshot() {
   return {form: "project_create", mode: "create", fields: globalThis.atlasCopilotContext.changedFields(CREATE_DEFAULTS, values)};
 }
 function fileFormSnapshot() {
-  const panel = $("#file-panel"), input = $("#relative-path"); if (!panel || !input || panel.hidden) return null;
-  return {form: "file_register", mode: "create", project_id: selected, area, fields: globalThis.atlasCopilotContext.changedFields({relative_path: ""}, {relative_path: input.value})};
+  const panel = $("#file-panel"), draft=fileDrafts.get(JSON.stringify([selected,area]));if(!panel||panel.hidden||!draft)return null;
+  return {form:"file_register",mode:"create",project_id:selected,area,fields:globalThis.atlasCopilotContext.changedFields({relative_path:"",title:""},draft.values),saving:draft.saving,...(draft.receipt?{confirmed:{id:draft.receipt.id,title:draft.receipt.title,relative_path:draft.receipt.relative_path,app:draft.receipt.app}}:{})};
 }
 function projectFormSnapshot() {
   const draft=projectDrafts.get(selected);if(!projectEditorOpen||!projectEditorElement?.isConnected||projectEditorElement.hidden||!draft||!Object.keys(draft.patch).length)return null;

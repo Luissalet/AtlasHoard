@@ -1,5 +1,13 @@
 # Atlas's Hoard
 
+**Register file** accepts an optional descriptive title for a newly registered
+internal file. It keeps the physical filename and path unchanged; an empty
+title uses the filename. Registering an existing path preserves its ID, title
+and application while reading the original bytes to refresh its revision.
+The receipt shows the title and path actually returned. Path/title drafts stay
+with their project and folder through navigation, cancellation and retries;
+pending responses preserve later edits. Existing API/MCP14 remain unchanged.
+
 Local shared storage for the Hoard family: ordinary project folders containing
 shared live files and each application's native files. All project members
 resolve the same original path; registering a PNG never copies or edits it.

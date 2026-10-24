@@ -1,5 +1,13 @@
 # Atlas's Hoard
 
+**Registrar archivo** admite un título descriptivo opcional para un archivo
+interno nuevo. No cambia su nombre ni su ruta; vacío utiliza el nombre físico.
+Si la ruta ya está registrada, el motor conserva su ID, título y aplicación,
+y actualiza la revisión leyendo los bytes del original sin modificarlo. El
+recibo muestra el título y la ruta realmente devueltos. Los borradores de ruta
+y título se conservan por proyecto y carpeta al navegar, cancelar o reintentar;
+las respuestas pendientes no borran ediciones posteriores. API/MCP14 conservados.
+
 La barra de **Proyectos** permite buscar por todas las palabras del nombre y del
 objetivo, sin distinguir mayúsculas ni acentos, y filtrar por estado y ámbito.
 Muestra el recuento, **Limpiar filtros** y un aviso si el proyecto abierto queda

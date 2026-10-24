@@ -25,6 +25,26 @@ def register(store, p, relative, data=b"original", caller="writer"):
     return result["file"]
 
 
+def test_internal_registration_title_unicode_default_and_existing_identity(store):
+    p = project(store)
+    paths = [Path(p["path"]) / name for name in ("shared/IMG_0042.txt", "shared/default.txt")]
+    for path in paths:
+        path.write_bytes(b"untouched fixture original")
+    before = [(path.read_bytes(), path.stat().st_mtime_ns) for path in paths]
+    title = "🧭" * 200  # Python characters, not a new UTF-16 browser limit.
+    args = {"project_id": p["id"], "relative_path": "shared/IMG_0042.txt", "title": title, "app": "lumiere"}
+    created = store.dispatch("atlas_file_register", args, "ui")["file"]
+    repeated = store.dispatch("atlas_file_register", {**args, "title": "Otro título", "app": "writer"}, "ui")["file"]
+    assert (repeated["id"], repeated["title"], repeated["app"]) == (created["id"], title, "lumiere")
+    default = store.dispatch("atlas_file_register", {"project_id": p["id"], "relative_path": "shared/default.txt", "title": "   "}, "ui")["file"]
+    assert default["title"] == "default.txt"
+    found = store.dispatch("atlas_files_search", {"project_id": p["id"], "query": title}, "ui")["files"]
+    assert [row["id"] for row in found] == [created["id"]]
+    context = store.dispatch("atlas_context", {"project_id": p["id"], "file_ids": [created["id"]]}, "ui")["context"]
+    assert context["files"][0]["title"] == title
+    assert [(path.read_bytes(), path.stat().st_mtime_ns) for path in paths] == before
+
+
 def test_project_search_finds_old_accessible_metadata_without_a_global_cutoff(store):
     old = project(store, name="Energía Ártica", goal="Cubiertas solares", sphere="work")
     store.dispatch("atlas_project_update", {"project_id": old["id"], "state": "archived"}, "writer")

@@ -70,6 +70,10 @@
 .reference-list h4{margin:0;font-size:16px;font-weight:500}
 .reference-list p{margin-top:8px;font-size:13px}
 .reference-list .path{font-size:12px}
+.registration-receipt{padding:18px 0;border-bottom:1px solid var(--hoard-border);overflow-wrap:anywhere}
+.registration-receipt p{margin-top:6px}.registration-receipt .muted{font-size:12px}
+.file-registration .file-form>p{margin-top:14px;overflow-wrap:anywhere}
+.file-registration .form-actions{flex-wrap:wrap}
 .reference-title,.reference-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .reference-title{justify-content:space-between}
 .reference-title>span{font-size:13px}

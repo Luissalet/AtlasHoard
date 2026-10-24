@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 const CC = require('../atlas_hoard/ui/copilot-context.js');
@@ -130,7 +131,7 @@ function boot({ projects, handler }) {
     return handler(body);
   };
   class FormData { constructor(form) { this.form = form; } [Symbol.iterator]() { return Object.entries(this.form.values)[Symbol.iterator](); } }
-  const context = vm.createContext({ document, window, fetch, FormData, CustomEvent, EventTarget, setTimeout, clearTimeout, console });
+  const context = vm.createContext({ document, window, fetch, FormData, CustomEvent, EventTarget, setTimeout, clearTimeout, console, crypto:{randomUUID} });
   vm.runInContext(fs.readFileSync('atlas_hoard/ui/copilot-context.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('atlas_hoard/ui/external-references.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('atlas_hoard/ui/app.js', 'utf8'), context);
@@ -140,6 +141,35 @@ const project = { id: 'p1', name: 'Lanzamiento', sphere: 'work', owner: 'writer'
 const ok = result => ({ ok: true, json: async () => ({ ok: true, result }) });
 const plain = x => JSON.parse(JSON.stringify(x));
 const tick = () => new Promise(r => setTimeout(r, 20));
+
+test('accepted registration refreshes the same project after a folder switch without replacing drafts', async () => {
+  const p={...project,members:['writer','lumiere'],hoard_paths:{...project.hoard_paths,lumiere:'/d/p1/hoards/lumiere'}};
+  const file={id:'new-file',title:'Título enviado',app:'writer',relative_path:'shared/new.txt',path:'/d/p1/shared/new.txt',exists:true};
+  let files=[],release,reads=0;
+  const app=boot({projects:[p],handler:body=>{
+    if(body.name==='atlas_file_register')return new Promise(resolve=>{release=()=>resolve(ok({file}));});
+    reads++;return ok({project:p,files});
+  }});
+  await tick();
+  const walk=(el,predicate)=>predicate(el)?el:el.children.map(child=>walk(child,predicate)).find(Boolean);
+  const panel=vm.runInContext('fileRegistrationPanel({project:activeProject})',app.context);
+  const path=walk(panel,el=>el.name==='relative_path'),title=walk(panel,el=>el.name==='title');
+  path.value='shared/new.txt';path.fire('input');title.value='Título enviado';title.fire('input');
+  const pending=walk(panel,el=>el.tag==='form').fire('submit');
+  await tick();
+  title.value='Edición posterior';title.fire('input');
+  vm.runInContext('area="lumiere";render({project:activeProject,files:[]})',app.context);
+  vm.runInContext('atlasCopilotContext.editFileDraft(fileDrafts.get(JSON.stringify(["p1","lumiere"])),"title","Otro borrador")',app.context);
+  files=[file];release();await pending;
+  assert.equal(reads,2,'a confirmed registration must refresh native files even after moving to another folder');
+  assert.equal(vm.runInContext('area',app.context),'lumiere');
+  assert.equal(vm.runInContext('fileDrafts.get(JSON.stringify(["p1","lumiere"])).values.title',app.context),'Otro borrador');
+  const shared=walk(app.q('#main'),el=>el.tag==='button'&&el.textContent==='Compartidos');
+  shared.fire('click');
+  assert.ok(walk(app.q('#main'),el=>el.tag==='strong'&&el.textContent==='Título enviado'),'returning to Shared uses the refreshed file list');
+  assert.equal(vm.runInContext('fileDrafts.get(JSON.stringify(["p1","shared"])).values.title',app.context),'Edición posterior');
+  assert.equal(vm.runInContext('fileDrafts.get(JSON.stringify(["p1","shared"])).receipt.id',app.context),'new-file');
+});
 
 test('reference selection survives filters and refresh, retries errors and rejects late snapshots', async () => {
   let release;

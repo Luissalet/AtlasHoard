@@ -48,6 +48,55 @@ def test_health_is_public_catalogue_and_calls_are_authenticated(app):
     assert linked["inputSchema"]["required"] == ["project_id", "source_path"]
 
 
+def test_completed_ui_registration_uses_new_receipt_and_reads_changed_original(app, monkeypatch):
+    import hashlib
+    from pathlib import Path
+    import shutil
+    import subprocess
+    from atlas_hoard import store as storage
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node required for the shipping registration helper")
+    base, store = app
+    project = store.dispatch("atlas_project_create", {"name": "Two explicit registrations", "owner": "writer"})["project"]
+    path = Path(project["path"]) / "shared/original.txt"
+    path.write_text("first fixture revision", encoding="utf-8")
+    reads = []
+    digest = storage.digest
+    def counted(candidate):
+        if candidate == path:
+            reads.append(str(candidate))
+        return digest(candidate)
+    monkeypatch.setattr(storage, "digest", counted)
+    script = r'''
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const [base,projectId,path,helper]=process.argv.slice(1),CC=require(helper);
+const draft=CC.fileDraft(),ids=[];let sequence=0;
+CC.editFileDraft(draft,'relative_path','shared/original.txt');CC.editFileDraft(draft,'title','Same descriptive title');
+const send=async(values,requestId)=>{
+  ids.push(requestId);
+  const response=await fetch(base+'/api/agent/call',{method:'POST',headers:{Authorization:'Bearer operator-token','Content-Type':'application/json'},body:JSON.stringify({name:'atlas_file_register',caller:'hub',arguments:{project_id:projectId,...values,request_id:requestId}})});
+  const body=await response.json();assert.equal(response.status,200);return body.result;
+};
+(async()=>{
+  assert.equal(await CC.saveFileDraft(draft,send,()=>`explicit-${++sequence}`),true);
+  const first=draft.receipt;
+  fs.writeFileSync(path,'second fixture revision','utf8');
+  assert.equal(await CC.saveFileDraft(draft,send,()=>`explicit-${++sequence}`),true);
+  assert.notEqual(ids[0],ids[1]);assert.equal(first.id,draft.receipt.id);
+  assert.notEqual(first.revision,draft.receipt.revision);assert.equal(draft.requestId,null);
+  assert.equal(draft.values.title,'Same descriptive title');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+'''
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run([node, "-e", script, base, project["id"], str(path), str(root / "atlas_hoard/ui/copilot-context.js")], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert len(reads) == 2
+    assert store.db.execute("SELECT COUNT(*) FROM receipts").fetchone()[0] == 2
+    assert store.db.execute("SELECT revision FROM files").fetchone()[0] == "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def test_external_file_link_and_resolve_are_available_through_agent_mcp_endpoint(app, tmp_path):
     base, store = app
     project = store.dispatch("atlas_project_create", {"name": "External refs", "owner": "writer"})["project"]

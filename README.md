@@ -96,6 +96,18 @@ See [the Spanish operating guide](README.es.md) for examples, backup behavior,
 resource coordination and practical limits. Vendored HoardLink keeps its license
 and attribution. This application is MIT licensed.
 
+**Multimodal anchors:** `atlas_anchor_create`, `_get`, `_list`, `_resolve` and
+`_comment` (HTTP and MCP) mark a precise place in a registered file revision: text
+range, spreadsheet cells, PDF page and rectangle, image region, audio/video time
+range, 3D part (GLB/OBJ/STL) or code symbol. When a new revision of the file is
+registered or refreshed, Atlas re-locates every anchor and records it as intact,
+moved, changed or lost for that revision; the anchor and its comments stay pinned
+to the revision they were made on. `atlas_anchor_resolve` returns what a client
+needs to open that exact place. The project's **Anclas / Anchors** tab lists anchors per file
+and revision and creates text, cell, PDF page/rectangle and other anchors from
+form fields. See [multimodal anchors](docs/ANCHORS.md). PDF text positions need
+the optional `pypdf` package; everything else uses the standard library.
+
 ## Faustus assistant
 
 Once the shared Hoard Link launcher is installed, the app shows the family's Faustus panel (a floating button). The conversation, the model and the tools live in Faustus; this app only tells the panel what is open.

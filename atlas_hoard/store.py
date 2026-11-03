@@ -18,6 +18,7 @@ import threading
 import time
 import unicodedata
 
+from .anchor_store import AnchorMixin
 from .hoard_link.paths import unsafe_output_dir, unsafe_file, is_inside, clean_user_path, reason
 
 ADMIN = {"hub", "ui"}
@@ -76,7 +77,7 @@ def digest(path):
     return "sha256:" + hasher.hexdigest(), size, current.st_mtime_ns
 
 
-class Workspace:
+class Workspace(AnchorMixin):
     def __init__(self, data_dir, root):
         self.data_dir = Path(data_dir).resolve()
         self.root = Path(clean_user_path(root)).resolve()
@@ -124,6 +125,7 @@ class Workspace:
         if "input_readonly" not in columns:
             self.db.execute("ALTER TABLE files ADD COLUMN input_readonly INTEGER NOT NULL DEFAULT 0")
         self.db.execute("CREATE UNIQUE INDEX IF NOT EXISTS files_external_key ON files(project_id, external_key) WHERE external_key IS NOT NULL")
+        self._init_anchors()
         configured = self.db.execute("SELECT value FROM settings WHERE key='root'").fetchone()
         if configured and configured[0] != str(self.root):
             self.db.close()
@@ -202,6 +204,7 @@ class Workspace:
             revision, size, mtime = digest(path)
             self.db.execute("UPDATE files SET revision=?, size=?, mtime_ns=?, state='available', updated=? WHERE id=?",
                             (revision, size, mtime, time.time(), row["id"]))
+            self._note_revision(row["id"], revision, size, path)
         return self.db.execute("SELECT * FROM files WHERE id=?", (row["id"],)).fetchone()
 
     def _mutate(self, tool, args, caller, fn):
@@ -352,11 +355,13 @@ class Workspace:
             uid = row["id"]
             self.db.execute("UPDATE files SET revision=?, size=?, mtime_ns=?, state='available', updated=? WHERE id=?",
                             (revision, size, mtime, time.time(), uid))
+            self._note_revision(uid, revision, size, path)
         else:
             uid = secrets.token_hex(8)
             self.db.execute("INSERT INTO files (id,project_id,relative_path,app,title,revision,size,mtime_ns,state,updated) "
                             "VALUES (?,?,?,?,?,?,?,?,'available',?)",
                             (uid, project["id"], relative, app, title or path.name, revision, size, mtime, time.time()))
+            self._note_revision(uid, revision, size, path)
         return self._file_view(self.db.execute("SELECT * FROM files WHERE id=?", (uid,)).fetchone(), project)
 
     def file_register(self, args, caller):
@@ -416,6 +421,7 @@ class Workspace:
             self.db.execute("INSERT INTO files (id,project_id,relative_path,app,title,revision,size,mtime_ns,state,updated,external_path,external_key,input_readonly) "
                             "VALUES (?,?,?,?,?,?,?,?,'available',?,?,?,1)",
                             (uid, project["id"], relative, app, title, revision, size, mtime, time.time(), str(source), normalized))
+            self._note_revision(uid, revision, size, source)
             row = self.db.execute("SELECT * FROM files WHERE id=?", (uid,)).fetchone()
             return {"ok": True, "file": self._file_view(row, project), "source_revision": revision,
                     "source_size": size, "source_path": str(source), "input_readonly": True}
@@ -545,7 +551,10 @@ class Workspace:
                     "atlas_file_link_source": self.file_link_source,
                     "atlas_derived_results": self.derived_results,
                     "atlas_derived_publish": self.derived_publish, "atlas_derived_lookup": self.derived_lookup,
-                    "atlas_context": self.context}
+                    "atlas_context": self.context,
+                    "atlas_anchor_create": self.anchor_create, "atlas_anchor_get": self.anchor_get,
+                    "atlas_anchor_list": self.anchor_list, "atlas_anchor_resolve": self.anchor_resolve,
+                    "atlas_anchor_comment": self.anchor_comment}
         if tool not in handlers:
             raise StoreError("unknown tool", 404)
         with self._lock, self.db:

@@ -43,7 +43,7 @@ def test_health_is_public_catalogue_and_calls_are_authenticated(app):
     assert http(base, "/api/agent/call", {"name": "atlas_projects"})[0] == 401
     code, body, _ = http(base, "/api/agent/tools", headers={"Authorization": "Bearer operator-token"})
     tools = json.loads(body)["tools"]
-    assert code == 200 and len(tools) == 14
+    assert code == 200 and len(tools) == 19
     linked = next(tool for tool in tools if tool["name"] == "atlas_file_link_source")
     assert linked["inputSchema"]["required"] == ["project_id", "source_path"]
 
@@ -162,3 +162,27 @@ def test_shared_assistant_launcher_is_injected_and_its_routes_are_guarded(app):
     assert code == 200 and b"faustus-chat" in raw
     assert http(base, "/api/copilot/info")[0] == 401
     assert http(base, "/api/copilot/proxy", {"path": "/api/chat/x"})[0] == 401
+
+
+def test_anchor_rest_calls_and_ui_script(app):
+    base, store = app
+    auth = {"Authorization": "Bearer operator-token"}
+    p = store.dispatch("atlas_project_create", {"name": "Anclas", "owner": "writer"})["project"]
+    from pathlib import Path
+    target = Path(p["path"]) / "shared" / "n.txt"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("uno\ndos\ntres\n", encoding="utf-8")
+    f = store.dispatch("atlas_file_register", {"project_id": p["id"], "relative_path": "shared/n.txt"}, "ui")["file"]
+    def call(name, arguments):
+        code, raw, _ = http(base, "/api/agent/call", {"name": name, "arguments": arguments, "caller": "hub"}, auth)
+        return code, json.loads(raw)
+    code, body = call("atlas_anchor_create", {"file_id": f["id"], "kind": "text", "selector": {"quote": "dos"}, "label": "Dos"})
+    assert code == 200 and body["result"]["anchor"]["selector"]["line_start"] == 2
+    anchor_id = body["result"]["anchor"]["id"]
+    target.write_text("cero\nuno\ndos\ntres\n", encoding="utf-8")
+    code, body = call("atlas_anchor_resolve", {"anchor_id": anchor_id})
+    assert code == 200 and body["result"]["status"] == "moved" and body["result"]["open"]["line_start"] == 3
+    code, body = call("atlas_anchor_get", {"anchor_id": "nope"})
+    assert code == 404
+    code, raw, headers = http(base, "/anchors.js")
+    assert code == 200 and b"atlasAnchors" in raw and "javascript" in headers["Content-Type"]

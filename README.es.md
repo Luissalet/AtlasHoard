@@ -209,6 +209,21 @@ El Hub añade reservas cooperativas de CPU, RAM y disco mediante
 deben adoptarla y respetar su presupuesto. No limita procesos nativos por fuerza
 ni sustituye las reservas GPU existentes.
 
+## Anclas multimodales
+
+`atlas_anchor_create`, `_get`, `_list`, `_resolve` y `_comment` (HTTP y MCP) marcan
+un lugar exacto de la revisión de un archivo registrado: rango de texto, celdas,
+página y rectángulo de un PDF, región de imagen, intervalo de audio o vídeo, pieza
+3D (GLB/OBJ/STL) o símbolo de código. Cuando se registra o refresca una revisión
+nueva, Atlas vuelve a localizar cada ancla y la anota como intacta, movida,
+cambiada o perdida en esa revisión; el ancla y sus comentarios siguen fijados a la
+revisión en la que se hicieron. `atlas_anchor_resolve` devuelve lo que necesita un
+cliente para abrir ese lugar exacto. La pestaña **Anclas / Anchors** del proyecto
+lista las anclas por archivo y revisión y permite crear anclas de texto, celdas,
+página y rectángulo de PDF y otras desde campos de formulario. Detalles en
+[anclas multimodales](docs/ANCHORS.es.md). Las posiciones de texto en PDF
+requieren el paquete opcional `pypdf`; el resto usa sólo la biblioteca estándar.
+
 ## Asistente de Faustus
 
 Con el lanzador compartido de Hoard Link instalado, la app muestra el panel de Faustus de la familia (un botón flotante). La conversación, el modelo y las herramientas viven en Faustus; esta app solo le dice al panel qué hay abierto.

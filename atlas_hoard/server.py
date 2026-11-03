@@ -80,6 +80,7 @@ def make_server(store, token, port=0):
                       "/app.js": (UI / "app.js", "text/javascript; charset=utf-8"),
                       "/derived-results.js": (UI / "derived-results.js", "text/javascript; charset=utf-8"),
                       "/external-references.js": (UI / "external-references.js", "text/javascript; charset=utf-8"),
+                      "/anchors.js": (UI / "anchors.js", "text/javascript; charset=utf-8"),
                       "/copilot-context.js": (UI / "copilot-context.js", "text/javascript; charset=utf-8"),
                       "/style.css": (UI / "style.css", "text/css; charset=utf-8"),
                       "/hoard-theme.css": (Path(__file__).parent / "hoard_link/ui/hoard-theme.css", "text/css; charset=utf-8")}

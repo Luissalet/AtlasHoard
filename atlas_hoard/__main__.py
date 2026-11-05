@@ -23,7 +23,7 @@ def main():
     args.data_dir.mkdir(parents=True, exist_ok=True)
     config_file = args.data_dir / "storage.json"
     config = json.loads(config_file.read_text(encoding="utf-8")) if config_file.exists() else {}
-    default = Path("D:/LocalAI/HoardStorage") if os.name == "nt" and Path("D:/LocalAI").is_dir() else Path.home() / "HoardStorage"
+    default = Path("E:/Development/IA/HoardStorage") if os.name == "nt" and Path("E:/Development/IA").is_dir() else Path.home() / "HoardStorage"
     root = args.root or Path(config.get("root") or default)
     store = Workspace(args.data_dir, root)
     write_json_atomic(config_file, {"root": str(store.root)})

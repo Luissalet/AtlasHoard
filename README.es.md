@@ -252,3 +252,7 @@ ediciones nativas, permisos, idempotencia tras reinicio, invalidación de result
 contexto acotado, origen del navegador y respuestas fuera de orden al cambiar de
 proyecto. HoardLink incluye integración real Atlas–Hub, consumidores Python/Node
 y restauración que conserva el archivo en uso. No son benchmarks de modelos.
+
+## Skills para los agentes que se conectan
+
+Esta app lleva procedimientos de la biblioteca de skills del espacio de trabajo de la familia para los agentes que se conectan: `shared-project-files`, `revision-aware-media`, `verification-loop`. Aparecen en lo que el agente lee al conectarse, se leen con `skills_list` y `skill_read`, se buscan y asignan con `skills_library` y `skills_assign`, y se ofrecen como prompts. Se eligen en la página de skills (`/api/agent/skills/page`) o en la pestaña Skills del hub; el bloque `skills` de `faustus-plugin.json` guarda lo que la app pide por defecto.

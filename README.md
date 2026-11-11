@@ -127,3 +127,7 @@ Once the shared Hoard Link launcher is installed, the app shows the family's Fau
 - **Refresh.** When the assistant finishes a turn the open project reloads in place (`hoard:copilot-turn-end` / `window.hoardCopilot.onTurnEnd`, merged into one reload). The relative path being typed keeps its text, focus and cursor.
 - **Saving.** `atlas_project_update` merges only the fields it receives, so an edit by the assistant and one by hand both survive (archiving touches only `state`). No endpoint changed; the page script is served at `/copilot-context.js`. The server mounts the relay under `/api/copilot/*` (session or token required, except the launcher script), injects the launcher into the page. The content security policy stays strict: the launcher styles itself with constructed stylesheets, so no inline styles are allowed.
 - **Tests.** `node --test tests/copilot-context.test.mjs` and `python -m pytest tests/test_copilot_ui.py tests/test_server.py tests/test_store.py`.
+
+## Skills for the agents that connect
+
+This app carries procedures from the skill library of the family's workspace for the agents that connect to it: `shared-project-files`, `revision-aware-media`, `verification-loop`. They are named in what an agent reads on connecting, read with `skills_list` and `skill_read`, searched and assigned with `skills_library` and `skills_assign`, and offered as prompts. The person chooses them on the skills page (`/api/agent/skills/page`) or in the hub's Skills tab; the `skills` block of `faustus-plugin.json` holds what the app asks for by default.

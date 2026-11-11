@@ -21,3 +21,7 @@ de un archivo registrado, para que Faustus u otro Hoard pueda saltar allí.
 * El allowlist de herramientas del Hub (`family-services.json` de HoardLink) debe ampliarse en el repositorio de HoardLink para que otros Hoards llamen a las herramientas de anclas a través del Hub; la copia vendida no se edita aquí.
 
 Documentación: `docs/ANCHORS.es.md` y `docs/ANCHORS.md`.
+
+## Skills for the agents that connect
+
+This app carries procedures from the skill library of the family's workspace for the agents that connect to it: `shared-project-files`, `revision-aware-media`, `verification-loop`. They are named in what an agent reads on connecting, read with `skills_list` and `skill_read`, searched and assigned with `skills_library` and `skills_assign`, and offered as prompts. The person chooses them on the skills page (`/api/agent/skills/page`) or in the hub's Skills tab; the `skills` block of `faustus-plugin.json` holds what the app asks for by default.

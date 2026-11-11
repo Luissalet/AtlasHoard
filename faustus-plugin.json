@@ -14,5 +14,6 @@
   },
   "mcp": {"transport": "stdio", "command": "{PYTHON}", "args": ["{ATLAS_DIR}/mcp_server.py"], "env": {"ATLAS_URL": "{APP_URL}", "ATLAS_TOKEN_FILE": "{TOKEN_FILE}"}, "optional_env": []},
   "x-family": {"copilot": true},
-  "notes": "Local-only. Native tools save/open the same shared file paths. Atlas never automatically moves existing projects. API membership is cooperative and does not impose OS filesystem ACLs. Anchors point to exact places (text, cells, PDF page+rect, code symbol, image region, time range, 3D part) pinned to a file revision and re-resolved on later revisions (atlas_anchor_*). A reusable result needs exact source hashes and a recipe including model revision when applicable."
+  "notes": "Local-only. Native tools save/open the same shared file paths. Atlas never automatically moves existing projects. API membership is cooperative and does not impose OS filesystem ACLs. Anchors point to exact places (text, cells, PDF page+rect, code symbol, image region, time range, 3D part) pinned to a file revision and re-resolved on later revisions (atlas_anchor_*). A reusable result needs exact source hashes and a recipe including model revision when applicable.",
+  "skills": {"slugs": ["shared-project-files", "revision-aware-media", "verification-loop"], "limit": 3}
 }

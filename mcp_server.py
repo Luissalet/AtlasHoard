@@ -6,6 +6,7 @@ import sys
 from urllib.parse import urlsplit
 
 from atlas_hoard.contracts import catalogue
+from atlas_hoard.hoard_link import skills as family_skills
 from atlas_hoard.hoard_link._hubclient import fetch_detailed
 
 
@@ -18,6 +19,7 @@ def main():
     if parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost") or parsed.username or parsed.password:
         raise ValueError("Atlas MCP only connects to local HTTP")
     path = Path(os.environ.get("ATLAS_TOKEN_FILE", str(Path(__file__).parent / "data/mcp-token")))
+    shelf = family_skills.raw("atlas", root=__file__, data_dir=path.parent)      # the skills this app carries
     for line in sys.stdin:
         req = None
         try:
@@ -25,7 +27,10 @@ def main():
             if "id" not in req:
                 continue
             method, params = req.get("method"), req.get("params", {})
-            if method == "initialize":
+            own = shelf.answer(method, params)
+            if own is not None:
+                result = own
+            elif method == "initialize":
                 result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "atlas-hoard", "version": "0.1.0"}}
             elif method == "ping":
                 result = {}
@@ -42,7 +47,7 @@ def main():
             else:
                 print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": "Method not found"}}), flush=True)
                 continue
-            print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}, ensure_ascii=False), flush=True)
+            print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": shelf.extend(method, result)}, ensure_ascii=False), flush=True)
         except json.JSONDecodeError:
             print(json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}), flush=True)
         except Exception:

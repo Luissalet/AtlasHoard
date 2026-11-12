@@ -22,7 +22,7 @@ def main():
     args = parser.parse_args()
     args.data_dir.mkdir(parents=True, exist_ok=True)
     config_file = args.data_dir / "storage.json"
-    config = json.loads(config_file.read_text(encoding="utf-8")) if config_file.exists() else {}
+    config = json.loads(config_file.read_text(encoding="utf-8-sig")) if config_file.exists() else {}
     default = Path("E:/Development/IA/HoardStorage") if os.name == "nt" and Path("E:/Development/IA").is_dir() else Path.home() / "HoardStorage"
     root = args.root or Path(config.get("root") or default)
     store = Workspace(args.data_dir, root)

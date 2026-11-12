@@ -182,6 +182,19 @@ def test_workspace_root_cannot_silently_change(tmp_path):
         Workspace(data, tmp_path / "other-disk")
 
 
+def test_empty_workspace_follows_a_new_root_when_the_old_one_is_gone(tmp_path):
+    import shutil
+    data = tmp_path / "private"
+    first = Workspace(data, tmp_path / "disk")
+    first.close()
+    shutil.rmtree(tmp_path / "disk")
+    second = Workspace(data, tmp_path / "other-disk")
+    try:
+        assert second.db.execute("SELECT value FROM settings WHERE key='root'").fetchone()[0] == str(second.root)
+    finally:
+        second.close()
+
+
 def test_import_is_explicit_operator_only_and_preserves_source_and_destination(store, tmp_path):
     p = project(store)
     source = tmp_path / "cover.png"

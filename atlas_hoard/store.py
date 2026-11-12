@@ -128,8 +128,13 @@ class Workspace(AnchorMixin):
         self._init_anchors()
         configured = self.db.execute("SELECT value FROM settings WHERE key='root'").fetchone()
         if configured and configured[0] != str(self.root):
-            self.db.close()
-            raise StoreError("workspace root changed; migrate the existing workspace explicitly before changing it", 409)
+            used = self.db.execute("SELECT (SELECT COUNT(*) FROM projects) + (SELECT COUNT(*) FROM files)").fetchone()[0]
+            if used or Path(configured[0]).exists():
+                self.db.close()
+                raise StoreError("workspace root changed; migrate the existing workspace explicitly before changing it", 409)
+            # An empty workspace whose recorded root is gone has nothing to migrate: follow the new root.
+            with self.db:
+                self.db.execute("UPDATE settings SET value=? WHERE key='root'", (str(self.root),))
         with self.db:
             self.db.execute("INSERT OR IGNORE INTO settings VALUES ('root',?)", (str(self.root),))
 

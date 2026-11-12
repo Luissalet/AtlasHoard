@@ -1,129 +1,12 @@
 # Atlas's Hoard
 
-**Ficha de archivo:** las filas internas de carpetas y búsqueda ofrecen **Ver detalles**.
-La ficha muestra ID/URI/ruta/aplicación y revisión SHA-256/tamaño registrados;
-abrirla no recalcula hashes. **Copiar referencia** copia la URI nativa
-`hoard://atlas/file/<id>`. **Actualizar metadatos** llama explícitamente al
-`atlas_file_resolve` existente por API/MCP14: lee bytes del original y actualiza
-sus metadatos, sin modificarlo ni abrir aplicaciones. Si falta, conserva revisión
-y tamaño anteriores y los identifica como registrados. Mantiene el límite nativo
-de inspección512MiB y los errores de cambio concurrente. No añade historial,
-visor de contenido, vigilancia ni herramientas/backend nuevos. Los borradores,
-búsqueda y selección de Preparar referencias se conservan.
+Almacenamiento compartido local para la familia Hoard: carpetas de proyecto normales que contienen archivos vivos compartidos y los archivos nativos de cada aplicación.
 
-**Registrar archivo** admite un título descriptivo opcional para un archivo
-interno nuevo. No cambia su nombre ni su ruta; vacío utiliza el nombre físico.
-Si la ruta ya está registrada, el motor conserva su ID, título y aplicación,
-y actualiza la revisión leyendo los bytes del original sin modificarlo. El
-recibo muestra el título y la ruta realmente devueltos. Los borradores de ruta
-y título se conservan por proyecto y carpeta al navegar, cancelar o reintentar;
-las respuestas pendientes no borran ediciones posteriores. API/MCP14 conservados.
+[Read in English](README.md)
 
-La barra de **Proyectos** permite buscar por todas las palabras del nombre y del
-objetivo, sin distinguir mayúsculas ni acentos, y filtrar por estado y ámbito.
-Muestra el recuento, **Limpiar filtros** y un aviso si el proyecto abierto queda
-fuera del resultado. Filtrar conserva ese proyecto y sus formularios sin guardar;
-el refresco mantiene los filtros y una respuesta antigua no sustituye a la nueva.
-Un error identifica la lista anterior y ofrece **Reintentar**. La operación nativa
-API/MCP `atlas_projects` admite `query`, `state` (`active`/`archived`) y `sphere`
-opcionales, conservando la respuesta `projects` y las llamadas sin argumentos.
-Lee todos los proyectos accesibles, incluidos los anteriores al antiguo corte
-global de1000registros. No busca archivos ni su contenido, no calcula huellas y no
-modifica proyectos, carpetas o rutas. El catálogo conserva sus14herramientas.
+## Qué es
 
-En **Archivos**, **Añadir referencia externa** registra una ruta absoluta de un
-archivo que permanece fuera de la carpeta del proyecto, con título opcional y
-Hoard participante. **Referencias externas del proyecto** muestra siempre esas
-entradas, independientemente de Compartidos o la carpeta de un Hoard: ruta real,
-solo lectura, disponibilidad, tamaño y revisión registrados. **Comprobar** usa
-el resolver nativo para actualizar hash/metadatos; **Copiar ruta original** copia
-su ruta. Ambas operaciones de registro/comprobación leen bytes para calcular el
-hash, sin copiar, modificar, ejecutar ni abrir un visualizador del original.
-Los borradores sobreviven a cambios de vista, errores y refrescos del asistente,
-y las referencias visibles forman parte del contexto de sólo lectura. En
-Resultados se pueden usar como origen y permanecen excluidas como salida. Los
-duplicados siguen la respuesta nativa existente, sin políticas nuevas. No cambia
-API/MCP14, backend, permisos ni dependencias.
-
-**Editar proyecto**, junto al título, permite cambiar nombre, objetivo opcional,
-otros Hoards participantes y estado en curso/archivado. Usa `atlas_project_update`
-existente y envía sólo los campos cambiados; vaciar el objetivo lo borra. Al abrir
-de nuevo o refrescar tras el asistente, los campos intactos se actualizan y los
-editados conservan su borrador, foco y cursor. Cerrar la edición guarda el borrador
-de esta sesión; **Descartar cambios** lo descarta. El contexto del asistente
-incluye los campos sin guardar.
-
-Renombrar no mueve la carpeta. Responsable, ámbito y rutas/revisiones/IDs de los
-archivos se conservan. El responsable permanece como miembro. Retirar otro Hoard
-conserva sus carpetas/archivos y, si su carpeta estaba abierta, vuelve a Compartidos
-al guardar. Los proyectos archivados siguen en la navegación con su etiqueta y se
-pueden reactivar desde el mismo editor. No cambia el backend ni los permisos.
-
-En **Resultados reutilizables**, cada proyecto muestra sus salidas registradas,
-la receta completa y las revisiones de los archivos de origen. **Comprobar ahora**
-verifica los hashes actuales: el listado comienza como pendiente de comprobar.
-Puedes **Registrar resultado** eligiendo una salida ya guardada y registrada,
-sus orígenes y la operación/versión; modelo y opciones JSON son opcionales.
-Declaras que la salida se obtuvo con las versiones actuales de esos orígenes.
-Si cambiaron desde que la generaste, vuelve a generarla antes de registrarla.
-Atlas registra la relación y no ejecuta la transformación. Los borradores se
-conservan al cambiar de vista y al refrescar tras un turno del asistente.
-
-La nueva herramienta MCP/HTTP `atlas_derived_results` recibe `project_id` y
-devuelve `results` con receta, revisiones guardadas y metadatos de origen/salida.
-Es de solo lectura, sin recalcular hashes: `freshness: "unchecked"` no significa
-vigente. `atlas_derived_lookup` hace la comprobación actual y
-`atlas_derived_publish` registra la relación con las revisiones explícitas.
-
-Cada proyecto permite **buscar archivos registrados por nombre o ruta**, sin
-distinguir mayúsculas ni acentos. Se puede buscar en todo el proyecto o en una
-carpeta y mostrar todos, los que siguen en su ruta o los que no se encuentran en
-disco. Las referencias externas aparecen al buscar en todo el proyecto y mantienen
-su acceso de solo lectura; las rutas se pueden copiar. No se busca dentro del
-contenido ni se exploran carpetas sin registrar.
-
-La herramienta MCP `atlas_files_search` y `POST /api/agent/call` ofrecen lo mismo:
-`project_id`, `query` opcional, `area` (`all`, `shared` o id de aplicación miembro),
-`availability` (`all`, `present`, `missing`), `limit` (1–200) y `offset`. Todas las
-palabras deben aparecer en el título o la ruta. Devuelve total y páginas; comprueba
-la existencia actual sin recalcular hashes ni cambiar revisiones.
-
-El disco compartido de los Hoards. Archivos normales, en carpetas normales:
-Paint, Gimp y los Hoards abren el mismo PNG desde la misma ruta.
-Funciona localmente, sin servicio en la nube ni dependencias de ejecución externas.
-
-## Empezar
-
-Abre **Iniciar Atlas's Hoard.cmd**, o ejecuta:
-
-```powershell
-venv\Scripts\python.exe -m atlas_hoard
-```
-
-La interfaz está en `http://127.0.0.1:5203`. En este equipo el disco se crea en
-`D:\LocalAI\HoardStorage`; los metadatos y el token están aparte, en `data/`.
-El Hub descubre Atlas al volver a explorar aplicaciones. Si el Hub o Lumiere ya
-estaban abiertos antes de esta actualización, reinícialos normalmente para cargar
-las nuevas operaciones; Atlas rechaza un intermediario antiguo sin identidad.
-En otro equipo se usa `~/HoardStorage`. Puedes elegir otro disco en el primer
-arranque con `--root RUTA`. Esa elección queda guardada: no cambies la raíz de
-una instalación con proyectos sin hacer una migración explícita.
-
-1. Crea un proyecto y escribe los IDs de los Hoards participantes.
-2. Copia la ruta de **Compartidos** y guarda allí tu PNG con Paint o Gimp.
-3. Regístralo con su ruta relativa, por ejemplo `shared/portada.png`.
-4. Los participantes resuelven ese mismo archivo por su ID. No reciben una copia.
-5. Cada pestaña de Hoard tiene una carpeta para sus propios archivos de proyecto.
-
-Para un original que debe permanecer en otra carpeta, el operador puede usar
-`atlas_file_link_source` para crear una referencia explícita de solo lectura.
-Atlas conserva su ruta absoluta, tamaño y revisión SHA-256 sin copiarlo.
-`atlas_file_resolve` actualiza la revisión después de los cambios y el contexto
-del proyecto marca la referencia como entrada de solo lectura. No se puede
-publicar una fuente enlazada como resultado derivado. `atlas_file_import` sigue
-siendo la operación explícita para hacer una copia única.
-Consulta [referencias a fuentes externas](docs/EXTERNAL-SOURCES.es.md) para el
-contrato MCP y sus límites de acceso al sistema de archivos.
+Atlas's Hoard da a los proyectos un lugar común en disco. Todas las aplicaciones miembro de un proyecto resuelven la misma ruta original por el ID del archivo, de modo que registrar un PNG nunca lo copia ni lo edita, y los originales siguen abriéndose con sus rutas normales aunque Atlas esté parado. Los metadatos (proyectos, IDs de archivo, revisiones, anclas, resultados derivados) viven aparte, en `data/`. La pertenencia a un proyecto gobierna la API, no los permisos de Windows: un proceso con acceso al disco puede abrir los archivos; Atlas no es una caja aislada.
 
 ```text
 HoardStorage/
@@ -137,122 +20,92 @@ HoardStorage/
       prospero/
 ```
 
-Puedes guardar formatos nativos donde la aplicación permita elegir destino.
-Las bases internas de las aplicaciones siguen en sus ubicaciones propias.
-Atlas no mueve proyectos existentes ni convierte todas las bases en una sola.
-Cambiar el nombre o archivar un proyecto conserva sus rutas y archivos.
-BookHoard y WatchHoard son independientes y quedan fuera de este ecosistema.
+Las bases de datos internas de las aplicaciones siguen donde estaban; Atlas no mueve nada ni las unifica. No hay vigilante continuo de archivos ni dependencia de la nube; BookHoard y WatchHoard son independientes.
 
-## Conexión con la familia
+## Qué hace
 
-El Hub descubre `faustus-plugin.json`, autentica al solicitante y conserva su
-identidad al llamar a Atlas. Faustus incluye el manifiesto local del plugin.
-No hay repositorio público de Atlas inventado en el catálogo de descarga.
+**Proyectos**
+- Crea un proyecto con nombre, objetivo opcional, esfera y los IDs de los Hoards participantes; cada uno recibe su carpeta junto a `shared/`.
+- **Editar proyecto**: cambia nombre, objetivo, participantes y estado activo/archivado; solo se envían los campos cambiados, los borradores sobreviven al cerrar y al refrescar, y renombrar o archivar conserva rutas, IDs de archivo y revisiones. Quitar un Hoard conserva sus carpetas y archivos.
+- Un buscador en la barra lateral filtra proyectos por nombre y objetivo (todas las palabras, sin distinguir mayúsculas ni acentos), estado y esfera, sin perder los formularios abiertos.
 
-- Python: `hoard_link.fam_workspace`.
-- Node: `hoard-commons/fam-workspace.js`.
-- Hub: `hub_workspace`, `GET /api/workspace/projects` y
-  `POST /api/workspace/call`.
-- Atlas: catálogo `/api/agent/tools`, llamadas `/api/agent/call`, y puente MCP
-  `mcp_server.py`. Comparten el catálogo, incluida la herramienta para enlazar
-  fuentes externas de solo lectura.
+**Archivos**
+- **Register file** toma una ruta relativa como `shared/portada.png` y un título descriptivo opcional; registrar una ruta ya existente conserva su ID y refresca la revisión. Cada archivo tiene un ID, una URI `hoard://atlas/file/<id>`, una revisión SHA-256 y un tamaño.
+- **Ver detalles** muestra el ID registrado, la URI, la ruta, la aplicación, la revisión y el tamaño; **Copiar referencia** copia la URI; **Actualizar metadatos** lee el original y refresca los metadatos registrados (un archivo ausente conserva su última revisión registrada, indicada como tal). La inspección por hash se limita a 512 MiB por archivo; los archivos mayores pueden seguir usándose en las carpetas del proyecto.
+- Búsqueda de archivos registrados por título o ruta (todas las palabras, sin distinguir mayúsculas ni acentos), por carpeta compartida o nativa y por presencia. Busca en los metadatos registrados, no en el contenido de los archivos ni en carpetas sin registrar.
+- **Referencias a fuentes externas** (**Añadir referencia externa**): un archivo que debe quedarse en otra carpeta se enlaza como solo lectura; Atlas conserva su ruta absoluta, tamaño y SHA-256 sin copiarlo. **Comprobar** refresca la revisión, **Copiar ruta original** copia la ruta. Las fuentes enlazadas pueden ser entradas de resultados derivados pero nunca salidas. `atlas_file_import` es la copia única explícita para el operador (nunca sobrescribe y necesita un sistema de archivos con enlaces duros). Véase [docs/EXTERNAL-SOURCES.es.md](docs/EXTERNAL-SOURCES.es.md).
 
-Configura el cliente común con el token propio de la aplicación, nunca con el
-de Atlas. Las respuestas incluyen `path`, `uri`, `project_id` y la revisión
-SHA-256 del archivo. Los IDs no sustituyen al sistema de archivos: incluso
-cuando Atlas esté parado puedes abrir los originales con sus rutas normales.
+**Resultados reutilizables**
+- Atlas guarda referencias a resultados ya producidos; las aplicaciones propietarias siguen haciendo el OCR, la transcripción, la indexación y la inferencia. La vista **Resultados reutilizables** muestra las salidas guardadas, las revisiones de las fuentes y la receta completa, y **Comprobar ahora** contrasta con los hashes actuales de los archivos.
+- La consulta recibe proyecto, IDs de fuentes y receta; un acierto de caché exige hashes exactos de fuentes y salida, versión de la operación, opciones y revisión del modelo. Publicar una salida registrada declara que se produjo a partir de esas revisiones de fuente y se rechaza si las fuentes cambiaron entretanto. Atlas no ejecuta la operación.
 
-**Lumiere** ofrece `media_shared(file_id)`: abre el original, aplica sus límites
-de carpetas y no lo copia. Al repetirlo después de editar el original, conserva
-el ID del medio en los montajes, actualiza sus medidas y renueva cachés y análisis.
-Espera a que terminen los trabajos activos de ese medio antes de refrescarlo.
-Quitar esa referencia de su biblioteca conserva el original compartido.
+**Anclas multimodales**
+- Marca un lugar exacto de la revisión de un archivo registrado: rango de texto, celdas, página y rectángulo de un PDF, región de imagen, intervalo de audio o vídeo, pieza 3D (GLB/OBJ/STL) o símbolo de código, con comentarios.
+- Cuando se registra o refresca una revisión nueva, Atlas vuelve a localizar cada ancla y la anota como intacta, movida, cambiada o perdida en esa revisión; las anclas y sus comentarios siguen fijados a la revisión en la que se hicieron. La pestaña **Anclas / Anchors** del proyecto las lista por archivo y revisión y crea anclas de texto, celdas, PDF y otras desde campos de formulario. Las posiciones de texto en PDF necesitan el paquete opcional `pypdf`. Véase [docs/ANCHORS.es.md](docs/ANCHORS.es.md).
 
-El resto de aplicaciones recibe los clientes y el contrato común. Sus
-importadores habituales conservan su comportamiento: algunos hacen copias.
-Para conservar una referencia viva deben usar la ruta de Atlas con una operación
-que enlace archivos; no basta con entregar esa ruta a un importador que copia.
-En particular, la importación habitual de Prospero continúa creando un recurso
-propio. No se anuncia una migración automática de todos los consumidores.
+**Contexto**
+- `atlas_context` construye un contexto acotado con objetivo, ámbito, participantes y hasta veinte referencias explícitas a archivos. El contenido de los archivos es material de trabajo, nunca instrucciones para el agente.
 
-## Resultados reutilizables y contexto
+**Copias de seguridad y recursos.** El Hub incluye el disco externo como `atlas-files` además de los metadatos de Atlas en las copias; restaurar exige una carpeta separada para revisión, y las copias no son una captura atómica de varias aplicaciones editando a la vez. El Hub ofrece además reservas cooperativas de CPU, RAM y disco (`hoard_link.fam_resources.claim`) que los consumidores deben adoptar y respetar.
 
-Atlas almacena referencias a resultados ya producidos; los propietarios
-existentes siguen haciendo OCR, transcripción, indexación e inferencia.
+## Cómo arrancarlo
 
-1. `atlas_derived_lookup` recibe proyecto, IDs de fuentes y receta.
-2. Si no hay resultado vigente, conserva las revisiones de `sources`, produce
-   un archivo nuevo y regístralo en el proyecto.
-3. `atlas_derived_publish` exige esas revisiones en `source_revisions` y el ID
-   del resultado. Si las fuentes cambiaron durante el trabajo, rechaza publicarlo.
-4. Otro participante puede reutilizar la misma ruta. Cambiar una fuente, el
-   resultado, la versión del procesamiento, las opciones o el modelo da un fallo
-   de caché. Incluye la revisión real del modelo en la receta cuando lo uses.
+Abre **Iniciar Atlas's Hoard.cmd**, o ejecuta:
 
-`atlas_context` construye un contexto acotado con objetivo, ámbito, participantes
-y hasta veinte referencias explícitas a archivos. Sus contenidos son material
-de trabajo, nunca instrucciones para el agente. No agrega toda la memoria personal.
-Los `request_id` de mutaciones guardan recibos persistentes para reintentos;
-no convierten una operación entre varios servicios en una transacción.
+```powershell
+python -m atlas_hoard
+```
 
-## Conservación y límites
+Requiere Python 3.11+ y nada fuera de la biblioteca estándar. La interfaz está en `http://127.0.0.1:5203`. `--root RUTA` elige el disco compartido en el primer arranque (por defecto: `HoardStorage` en la carpeta de desarrollo en Windows si existe, o en la carpeta personal en caso contrario). Esa elección queda guardada; no cambies la raíz de una instalación con proyectos sin una migración explícita.
 
-El registro de archivos no modifica originales. La importación externa es una
-copia inicial explícita, solo para el operador: conserva la fuente y rechaza
-sobrescribir destinos. Requiere un sistema de archivos con enlaces duros, como
-NTFS; si una operación interrumpida dejó un archivo completo sin registrar,
-regístralo por su ruta en lugar de sobrescribirlo.
+1. Crea un proyecto y escribe los IDs de los Hoards participantes.
+2. Copia la ruta de **Compartidos** y guarda allí tu archivo con cualquier editor.
+3. Regístralo por su ruta relativa, por ejemplo `shared/portada.png`.
+4. Los participantes resuelven el mismo archivo por su ID; nadie recibe una copia.
 
-El Hub incluye el disco externo como `atlas-files` además de los metadatos de
-Atlas en las copias de seguridad. Restaurarlo exige una carpeta separada para
-revisión. Las copias siguen los límites/exclusiones del Hub y no son una captura
-atómica de varias aplicaciones editando simultáneamente.
+## Conexión con Faustus y el Hub
 
-La pertenencia a proyectos gobierna la API, no los permisos de Windows. Un
-proceso con acceso al disco puede abrir sus archivos. No es una caja aislada.
-No hay vigilante continuo del sistema de archivos: resolver un archivo o buscar
-un resultado refresca su revisión; un archivo movido se señala como ausente.
-La inspección por hash está limitada a 512 MiB por archivo. Los archivos más
-grandes pueden guardarse y usarse directamente en las carpetas del proyecto.
+El Hub descubre `faustus-plugin.json`, autentica al solicitante y conserva su identidad al llamar a Atlas. Clientes: Python `hoard_link.fam_workspace`, Node `hoard-commons/fam-workspace.js`, Hub `hub_workspace`, `GET /api/workspace/projects` y `POST /api/workspace/call`. Atlas sirve su catálogo en `/api/agent/tools`, las llamadas en `/api/agent/call` y un puente MCP por stdio, `mcp_server.py`. Las respuestas incluyen `path`, `uri`, `project_id` y la revisión SHA-256.
 
-El Hub añade reservas cooperativas de CPU, RAM y disco mediante
-`hoard_link.fam_resources.claim`. Es una capacidad opcional: los consumidores
-deben adoptarla y respetar su presupuesto. No limita procesos nativos por fuerza
-ni sustituye las reservas GPU existentes.
+Herramientas, por grupos:
+- Proyectos: `atlas_projects` (con `query`, `state` y `sphere` opcionales), `atlas_project`, `atlas_project_create`, `atlas_project_update` (fusiona solo los campos que recibe), `atlas_location`, `atlas_session`, `atlas_context`.
+- Archivos: `atlas_file_register`, `atlas_file_resolve`, `atlas_files_search`, `atlas_file_link_source`, `atlas_file_import`.
+- Resultados derivados: `atlas_derived_lookup`, `atlas_derived_publish`, `atlas_derived_results`.
+- Anclas: `atlas_anchor_create`, `atlas_anchor_get`, `atlas_anchor_list`, `atlas_anchor_resolve`, `atlas_anchor_comment`.
 
-## Anclas multimodales
+Las mutaciones llevan un `request_id` que guarda un recibo persistente para los reintentos; esto no convierte una operación entre varios servicios en una transacción.
 
-`atlas_anchor_create`, `_get`, `_list`, `_resolve` y `_comment` (HTTP y MCP) marcan
-un lugar exacto de la revisión de un archivo registrado: rango de texto, celdas,
-página y rectángulo de un PDF, región de imagen, intervalo de audio o vídeo, pieza
-3D (GLB/OBJ/STL) o símbolo de código. Cuando se registra o refresca una revisión
-nueva, Atlas vuelve a localizar cada ancla y la anota como intacta, movida,
-cambiada o perdida en esa revisión; el ancla y sus comentarios siguen fijados a la
-revisión en la que se hicieron. `atlas_anchor_resolve` devuelve lo que necesita un
-cliente para abrir ese lugar exacto. La pestaña **Anclas / Anchors** del proyecto
-lista las anclas por archivo y revisión y permite crear anclas de texto, celdas,
-página y rectángulo de PDF y otras desde campos de formulario. Detalles en
-[anclas multimodales](docs/ANCHORS.es.md). Las posiciones de texto en PDF
-requieren el paquete opcional `pypdf`; el resto usa sólo la biblioteca estándar.
+**Lumiere** ofrece `media_shared(file_id)`: abre el original dentro de los límites de sus carpetas sin copiarlo, y al repetirlo tras editar el original conserva el ID del medio en los montajes, actualiza sus medidas y renueva cachés y análisis. Quitar esa referencia de su biblioteca conserva el original compartido. El resto de aplicaciones recibe los clientes y el contrato comunes; sus importadores habituales conservan su comportamiento y algunos copian archivos, así que una referencia viva requiere una operación que enlace archivos.
 
-## Asistente de Faustus
+**Asistente de Faustus.** El lanzador compartido de Hoard Link muestra el panel de Faustus de la familia (un botón flotante). La conversación, el modelo y las herramientas viven en Faustus; esta app solo le dice al panel qué hay abierto.
+- Contexto por vista: un proyecto abierto se envía como `project` (id, nombre, esfera, propietario, objetivo, estado, miembros, ruta, ruta compartida) y los archivos del área actual como `file`, hasta 50 (título, ruta relativa, app, revisión, estado, presencia, ruta). Solo se envían metadatos, nunca el contenido de los archivos.
+- Los campos sin guardar (`project_create`, `file_register`) se devuelven con el evento de ventana `atlas:context-request`. Cuando el asistente termina un turno, el proyecto abierto se recarga en el sitio, conservando el texto, el foco y el cursor de lo que se está escribiendo.
+- El relevo se monta bajo `/api/copilot/*` (exige sesión o token, salvo el script del lanzador) y el script de la página se sirve en `/copilot-context.js`. La política de seguridad de contenido se mantiene estricta.
 
-Con el lanzador compartido de Hoard Link instalado, la app muestra el panel de Faustus de la familia (un botón flotante). La conversación, el modelo y las herramientas viven en Faustus; esta app solo le dice al panel qué hay abierto.
+**Skills.** La app lleva `shared-project-files`, `revision-aware-media` y `verification-loop` de la biblioteca de skills de la familia para los agentes que se conectan, que se leen con `skills_list` y `skill_read` y se asignan en la página de skills (`/api/agent/skills/page`) o en la pestaña Skills del hub.
 
-- **Contexto por vista.** Un proyecto abierto se envía como `project` con su id real, nombre, esfera, propietario, objetivo, estado, miembros, ruta y ruta compartida, y como proyecto externo del panel. Los archivos del área actual (`shared` o la carpeta de una app) van detrás como `file`, hasta 50: título, ruta relativa, app, revisión, estado, si existe y ruta. Solo se envían metadatos, nunca el contenido de los archivos. Sin proyecto abierto la vista es `home` y no da objeto.
-- **Campos sin guardar.** El panel los pide con el evento de ventana `atlas:context-request`. Los formularios abiertos responden con los campos que difieren de sus valores por defecto: `project_create` (proyecto nuevo) y `file_register` (ruta relativa).
-- **Refresco.** Cuando el asistente termina un turno, el proyecto abierto se recarga en el sitio (`hoard:copilot-turn-end` / `window.hoardCopilot.onTurnEnd`, unidos en una sola recarga). La ruta relativa que estás escribiendo conserva su texto, el foco y el cursor.
-- **Guardado.** `atlas_project_update` fusiona solo los campos que recibe, de modo que sobreviven tanto la edición del asistente como la manual (archivar solo toca `state`). No cambia ningún endpoint; el script de la página se sirve en `/copilot-context.js`. El servidor monta el relevo en `/api/copilot/*` (exige sesión o token, salvo el script del lanzador), inyecta el lanzador en la página y su política de seguridad de contenido permite estilos en línea porque el panel inserta su propia hoja de estilos.
-- **Pruebas.** `node --test tests/copilot-context.test.mjs` y `python -m pytest tests/test_copilot_ui.py tests/test_server.py tests/test_store.py`.
+## Estructura del proyecto
 
-## Verificación
+| Ruta | Contenido |
+|---|---|
+| `atlas_hoard/` | servidor, almacén, anclas, contratos |
+| `atlas_hoard/ui/` | interfaz web |
+| `atlas_hoard/hoard_link/` | biblioteca de la familia incluida (conserva su licencia y atribución) |
+| `mcp_server.py` | puente MCP por stdio |
+| `faustus-plugin.json` | manifiesto del plugin |
+| `docs/` | anclas y referencias a fuentes externas (en español e inglés) |
+| `tests/` | pruebas de Python y JS |
+| `data/` | metadatos y token (no versionados) |
 
-Las pruebas usan carpetas aisladas y datos sintéticos. Cubren rutas compartidas,
-ediciones nativas, permisos, idempotencia tras reinicio, invalidación de resultados,
-contexto acotado, origen del navegador y respuestas fuera de orden al cambiar de
-proyecto. HoardLink incluye integración real Atlas–Hub, consumidores Python/Node
-y restauración que conserva el archivo en uso. No son benchmarks de modelos.
+## Pruebas
 
-## Skills para los agentes que se conectan
+```powershell
+python -m pytest tests
+node --test tests/copilot-context.test.mjs tests/anchors-ui.test.mjs tests/external-references.test.mjs
+```
 
-Esta app lleva procedimientos de la biblioteca de skills del espacio de trabajo de la familia para los agentes que se conectan: `shared-project-files`, `revision-aware-media`, `verification-loop`. Aparecen en lo que el agente lee al conectarse, se leen con `skills_list` y `skill_read`, se buscan y asignan con `skills_library` y `skills_assign`, y se ofrecen como prompts. Se eligen en la página de skills (`/api/agent/skills/page`) o en la pestaña Skills del hub; el bloque `skills` de `faustus-plugin.json` guarda lo que la app pide por defecto.
+Las pruebas usan carpetas aisladas y datos sintéticos.
+
+## Licencia
+
+MIT.

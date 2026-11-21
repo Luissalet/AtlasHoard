@@ -4,6 +4,7 @@ import urllib.error
 import urllib.request
 import pytest
 
+from atlas_hoard.contracts import catalogue
 from atlas_hoard.store import Workspace
 from atlas_hoard.server import make_server
 from atlas_hoard.hoard_link import family
@@ -43,7 +44,8 @@ def test_health_is_public_catalogue_and_calls_are_authenticated(app):
     assert http(base, "/api/agent/call", {"name": "atlas_projects"})[0] == 401
     code, body, _ = http(base, "/api/agent/tools", headers={"Authorization": "Bearer operator-token"})
     tools = json.loads(body)["tools"]
-    assert code == 200 and len(tools) == 19
+    assert code == 200
+    assert tools == catalogue()
     linked = next(tool for tool in tools if tool["name"] == "atlas_file_link_source")
     assert linked["inputSchema"]["required"] == ["project_id", "source_path"]
 

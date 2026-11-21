@@ -164,6 +164,18 @@ def test_shared_assistant_launcher_is_injected_and_its_routes_are_guarded(app):
     assert http(base, "/api/copilot/proxy", {"path": "/api/chat/x"})[0] == 401
 
 
+@pytest.mark.parametrize(("headers", "expected"), [
+    ({}, 401),
+    ({"Authorization": "Bearer operator-token", "Origin": "https://untrusted.example"}, 403),
+])
+def test_rejected_post_delivers_json_while_closing_the_upload(app, headers, expected):
+    base, _ = app
+    body = {"path": "/api/chat/x", "padding": "x" * (255 * 1024)}
+    status, raw, _ = http(base, "/api/copilot/proxy", body, headers)
+    assert status == expected
+    assert json.loads(raw) == {"ok": False, "error": "request refused"}
+
+
 def test_anchor_rest_calls_and_ui_script(app):
     base, store = app
     auth = {"Authorization": "Bearer operator-token"}

@@ -5,6 +5,8 @@ import json
 import logging
 from pathlib import Path
 import secrets
+from socket import SHUT_WR
+from time import monotonic
 from urllib.parse import urlsplit
 
 from . import __version__
@@ -63,6 +65,27 @@ def make_server(store, token, port=0):
                 return "ui"
             return None
 
+        def refuse_post(self, status):
+            self.close_connection = True
+            self.reply({"ok": False, "error": "request refused"}, status)
+            try:
+                remaining = min(int(self.headers.get("Content-Length", "0")), MAX_BODY)
+            except ValueError:
+                remaining = 0
+            try:
+                # Deliver the rejection before discarding the upload. Closing with
+                # unread request bytes can reset the connection and lose the reply.
+                self.connection.shutdown(SHUT_WR)
+                deadline = monotonic() + 0.5
+                while remaining > 0 and (time_left := deadline - monotonic()) > 0:
+                    self.connection.settimeout(time_left)
+                    chunk = self.rfile.read1(remaining)
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+            except OSError:
+                pass  # The client disconnected or stopped sending the rejected body.
+
         def do_GET(self):
             if not self.same_origin():
                 return self.reply({"ok": False, "error": "origin refused"}, 403)
@@ -98,8 +121,7 @@ def make_server(store, token, port=0):
         def do_POST(self):
             identity = self.authorized()
             if not self.same_origin() or not identity:
-                self.close_connection = True
-                return self.reply({"ok": False, "error": "request refused"}, 403 if identity else 401)
+                return self.refuse_post(403 if identity else 401)
             if urlsplit(self.path).path == "/api/copilot/proxy":
                 relay.handle(self)
                 self.close_connection = True

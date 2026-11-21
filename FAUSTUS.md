@@ -22,6 +22,10 @@ de un archivo registrado, para que Faustus u otro Hoard pueda saltar allí.
 
 Documentación: `docs/ANCHORS.es.md` y `docs/ANCHORS.md`.
 
+## Pruebas de desarrollo
+
+Desde la raíz del repositorio, instala las dependencias de prueba con `python -m pip install ".[test]"` y ejecuta `python -m pytest`. Si el entorno se creó sin pip, ejecuta primero `python -m ensurepip`. La suite completa usa también Node.js para ejecutar las pruebas de la interfaz.
+
 ## Skills for the agents that connect
 
 This app carries procedures from the skill library of the family's workspace for the agents that connect to it: `shared-project-files`, `revision-aware-media`, `verification-loop`. They are named in what an agent reads on connecting, read with `skills_list` and `skill_read`, searched and assigned with `skills_library` and `skills_assign`, and offered as prompts. The person chooses them on the skills page (`/api/agent/skills/page`) or in the hub's Skills tab; the `skills` block of `faustus-plugin.json` holds what the app asks for by default.

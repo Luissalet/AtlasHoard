@@ -7,3 +7,12 @@ __pycache__/
 .impeccable/review/
 .impeccable/live/
 *.egg-info/
+# Local agent and tool state (created per user at runtime)
+.faustus/
+.odysseus/
+.claude/
+.agents/
+.codex/
+.playwright-mcp/
+.hoard-integration.json
+.impeccable/
